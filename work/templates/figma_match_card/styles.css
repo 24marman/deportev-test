@@ -125,6 +125,7 @@ body {
   width: 90px;
   height: 140px;
   object-fit: contain;
+  object-position: center;
   margin: 0 auto 5px;
   mix-blend-mode: screen;
 }
@@ -380,6 +381,7 @@ body {
   width: 38px;
   height: 42px;
   object-fit: contain;
+  object-position: center;
   display: block;
   margin: 0 auto 18px;
   mix-blend-mode: exclusion;

@@ -72,9 +72,13 @@ async function renderMatchCard({ data, templateDir = DEFAULT_TEMPLATE_DIR, outpu
     }
 
     const card = page.locator("#match-card");
-    const pngBuffer = await card.screenshot({ type: "png" });
+    const pngBuffer = await card.screenshot({
+      type: "png",
+      omitBackground: false,
+    });
 
     await sharp(pngBuffer)
+      .rotate()
       .webp({
         quality,
         effort: 5,
