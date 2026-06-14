@@ -34,10 +34,11 @@ RENDER_QUALITY=88
 Para probar un render al arrancar:
 
 ```env
+RUN_ON_START=true
 RUN_ON_START_EVENT_ID=8293
 ```
 
-Cuando ya este probado, quitar `RUN_ON_START_EVENT_ID` para que no genere la misma imagen en cada restart.
+Cuando ya este probado, dejar `RUN_ON_START=false` para que no genere la misma imagen en cada restart.
 
 ## Variables Futuras Para X/Twitter
 

@@ -76,6 +76,8 @@ async function renderEvent(eventId) {
 }
 
 async function runStartupJob() {
+  if (process.env.RUN_ON_START !== "true") return;
+
   const eventId = process.env.RUN_ON_START_EVENT_ID;
   if (!eventId) return;
 
