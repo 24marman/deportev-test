@@ -75,5 +75,6 @@ async function uploadGeneratedImage(filePath, destinationPath) {
 }
 
 module.exports = {
+  getSupabaseClient,
   uploadGeneratedImage,
 };

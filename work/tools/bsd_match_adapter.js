@@ -246,6 +246,29 @@ async function fetchMatchData(eventId) {
   return toMatchData(event, incidents, venue);
 }
 
+function extractEvents(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.events)) return payload.events;
+  return [];
+}
+
+async function fetchLiveEvents() {
+  const token = process.env.BSD_API_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing BSD_API_TOKEN environment variable.");
+  }
+
+  const payload = await requestJson(
+    `/events/live/?league_id=${WORLD_CUP.leagueId}&season_id=${WORLD_CUP.seasonId}`,
+    token,
+  );
+
+  return extractEvents(payload);
+}
+
 if (require.main === module) {
   main().catch((error) => {
     console.error(error.message);
@@ -256,6 +279,7 @@ if (require.main === module) {
 module.exports = {
   WORLD_CUP,
   requestJson,
+  fetchLiveEvents,
   fetchMatchData,
   toMatchData,
   getVenueName,

@@ -51,6 +51,14 @@ Cuando el diseno de Figma use Auto Layout, este agente debe revisar y documentar
 
 La implementacion no se aprueba si un grupo de Auto Layout se replica solamente con coordenadas manuales cuando deberia comportarse como layout dinamico.
 
+Reglas obligatorias:
+
+- Respetar la estructura de Auto Layout antes que una coincidencia visual puntual.
+- Mantener `gap`, padding, alineacion y orden de hijos como propiedades del contenedor, no como offsets aislados en cada elemento.
+- Usar `position: absolute` solo para capas que en Figma sean libres, superpuestas o decorativas, no para simular un Auto Layout principal.
+- Conservar el comportamiento `hug contents`, `fill container` o `fixed` con equivalentes CSS claros: contenido intrinseco, flex-grow/flex-basis, width/height fijos o constraints.
+- Probar el layout con datos cortos y largos antes de aprobar, porque la fidelidad real depende de que el Auto Layout sobreviva a datos dinamicos.
+
 ## Regla Para Elementos Dinamicos
 
 Todo elemento que cambie por datos debe conservar el comportamiento del Auto Layout:
@@ -99,8 +107,26 @@ La auditoria debe revisar no solo que la propiedad exista, sino que la capa este
 ## Reglas Para SVG Y Blend Modes En Render Final
 
 - Logos, iconos, escudos y simbolos oficiales deben conservar proporciones con `object-fit: contain` y SVG `preserveAspectRatio="xMidYMid meet"`.
+- No aplastar, estirar ni convertir logos/SVGs oficiales a cajas de proporcion distinta para que "entren"; si el espacio no coincide, corregir el contenedor, la mascara o el sizing.
+- Revisar `viewBox`, `width`, `height`, `object-fit`, `aspect-ratio` y `preserveAspectRatio` antes de culpar al asset.
 - Solo ornamentos abstractos, lineas decorativas, mascaras o fondos pueden usar `preserveAspectRatio="none"`.
-- Si un SVG contiene `mix-blend-mode` interno, el agente debe validar si conviene mover el blend mode al wrapper HTML para que el navegador lo mezcle contra el fondo correcto.
+- Los elementos hoja deben recibir el blend mode que corresponda segun Figma. Si el nodo visible final es un `img`, `svg`, texto o divisor, aplicar y verificar el blend mode en ese elemento hoja siempre que sea posible.
+- Evitar doble `mix-blend-mode` en wrapper + SVG interno. Si ambos tienen blend mode, el navegador puede mezclar dos veces o contra un stacking context inesperado.
+- Si un SVG contiene `mix-blend-mode` interno, el agente debe decidir una sola fuente de verdad: mantenerlo dentro del SVG cuando reproduce fielmente el export, o moverlo al wrapper HTML cuando necesite mezclarse contra el fondo de la pagina. Documentar la decision.
+- Si se usa blend mode en wrapper por necesidad tecnica, el SVG interno no debe repetir el mismo blend mode salvo que Figma tenga capas anidadas con mezclas distintas y comprobadas.
 - El checklist no se aprueba por revisar CSS solamente: debe compararse el WebP final contra el frame/export de Figma.
 - Los elementos con `difference` deben revisarse sobre el fondo real del partido, porque sobre zonas casi negras el efecto puede verse casi identico al color original.
 - Si el render de Playwright/WebP no coincide con Figma, el agente debe proponer una estrategia de fidelidad: ajustar stacking context, rasterizar capas fijas desde Figma, inline SVG, o postproceso controlado.
+
+## Verificacion De `difference`
+
+`mix-blend-mode: difference` no siempre produce un contraste dramatico. Sobre fondos oscuros, casi negros o con poca variacion tonal, el resultado puede verse sutil y parecer que el modo no esta aplicado aunque si lo este.
+
+Para verificarlo:
+
+- Comparar el render sobre el fondo real de Figma, no sobre un fondo temporal.
+- Tomar screenshot/WebP del template y compararlo contra el export de Figma en la misma escala.
+- Probar temporalmente un fondo claro y uno oscuro solo como diagnostico; no dejar ese cambio en el template.
+- Inspeccionar que el elemento no este dentro de un wrapper con `isolation`, `opacity`, `transform`, `filter` o `mix-blend-mode` adicional que cambie el stacking context.
+- Confirmar que el blend mode este en el nodo visible correcto, especialmente en textos, lineas, hojas decorativas, banderas y SVGs.
+- Si la diferencia visual sigue siendo minima pero coincide con Figma sobre el fondo real, documentarlo como comportamiento esperado, no como bug.

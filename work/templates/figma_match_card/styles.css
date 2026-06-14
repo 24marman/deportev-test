@@ -228,7 +228,6 @@ body {
   height: 240px;
   display: grid;
   place-items: center;
-  mix-blend-mode: difference;
 }
 
 .flag-border {
@@ -286,7 +285,6 @@ body {
   grid-template-columns: 235px 2px 235px;
   align-items: stretch;
   gap: 10px;
-  mix-blend-mode: difference;
   transform: translateX(-50%);
 }
 
@@ -374,7 +372,6 @@ body {
   text-transform: uppercase;
   color: var(--green);
   text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
-  mix-blend-mode: exclusion;
 }
 
 .venue img {
