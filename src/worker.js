@@ -59,10 +59,20 @@ async function renderEvent(eventId) {
       : `Skipped upload: ${uploadResult.reason}`,
   );
 
-  const socialResult = await publishFinalScorePost({
-    matchData,
-    imagePath: outputPath,
-  });
+  let socialResult;
+  try {
+    socialResult = await publishFinalScorePost({
+      matchData,
+      imagePath: outputPath,
+    });
+  } catch (error) {
+    socialResult = {
+      published: false,
+      mode: process.env.X_POST_MODE || "manual",
+      reason: error.message,
+    };
+  }
+
   console.log(
     socialResult.published
       ? `Published ${socialResult.tweetUrl}`
