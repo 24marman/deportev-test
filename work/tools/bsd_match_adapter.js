@@ -279,6 +279,29 @@ async function fetchLiveEvents() {
   return extractEvents(payload);
 }
 
+async function fetchEvents(params = {}) {
+  const token = process.env.BSD_API_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing BSD_API_TOKEN environment variable.");
+  }
+
+  const query = new URLSearchParams({
+    league_id: String(WORLD_CUP.leagueId),
+    season_id: String(WORLD_CUP.seasonId),
+    limit: String(params.limit || 100),
+  });
+
+  for (const key of ["date_from", "date_to", "status", "team_id", "team_name", "offset"]) {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== "") {
+      query.set(key, String(params[key]));
+    }
+  }
+
+  const payload = await requestJson(`/events/?${query.toString()}`, token);
+  return extractEvents(payload);
+}
+
 if (require.main === module) {
   main().catch((error) => {
     console.error(error.message);
@@ -290,6 +313,7 @@ module.exports = {
   WORLD_CUP,
   requestJson,
   fetchEvent,
+  fetchEvents,
   fetchLiveEvents,
   fetchMatchData,
   toMatchData,

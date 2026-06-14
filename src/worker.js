@@ -120,6 +120,67 @@ function getStrongMonitorDelayMinutes() {
   return Number(process.env.SECOND_HALF_STRONG_MONITOR_MINUTES || "40");
 }
 
+function addDays(date, days) {
+  const copy = new Date(date);
+  copy.setUTCDate(copy.getUTCDate() + days);
+  return copy;
+}
+
+function formatDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getMonitoringDateRange(now = new Date()) {
+  const beforeDays = Number(process.env.MONITOR_LOOKBACK_DAYS || "1");
+  const afterDays = Number(process.env.MONITOR_LOOKAHEAD_DAYS || "1");
+
+  return {
+    dateFrom: formatDate(addDays(now, -beforeDays)),
+    dateTo: formatDate(addDays(now, afterDays)),
+  };
+}
+
+function mergeEvents(...eventGroups) {
+  const seen = new Set();
+  const merged = [];
+
+  for (const group of eventGroups) {
+    for (const event of group || []) {
+      if (!event?.id) continue;
+      const key = String(event.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(event);
+    }
+  }
+
+  return merged;
+}
+
+async function fetchMonitorEvents() {
+  const liveEvents = await bsd.fetchLiveEvents();
+  const { dateFrom, dateTo } = getMonitoringDateRange();
+  let windowEvents = [];
+
+  try {
+    windowEvents = await bsd.fetchEvents({
+      date_from: dateFrom,
+      date_to: dateTo,
+      limit: 100,
+    });
+  } catch (error) {
+    console.error(`Could not fetch BSD schedule window ${dateFrom} to ${dateTo}: ${error.message}`);
+  }
+
+  const events = mergeEvents(liveEvents, windowEvents);
+  console.log(
+    `Monitor checked ${events.length} BSD events ` +
+      `(${liveEvents.length} live, ${windowEvents.length} window ${dateFrom}..${dateTo}).`,
+  );
+
+  return events;
+}
+
 async function processFinishedEvent(event, state) {
   const eventId = String(event.id);
   const record = state.matches[eventId] || {};
@@ -157,13 +218,11 @@ async function processFinishedEvent(event, state) {
 
 async function tickMonitor() {
   let state = await loadMonitorState();
-  const liveEvents = await bsd.fetchLiveEvents();
+  const monitorEvents = await fetchMonitorEvents();
   const now = new Date().toISOString();
   const strongDelay = getStrongMonitorDelayMinutes();
 
-  console.log(`Monitor checked ${liveEvents.length} live BSD events.`);
-
-  for (const event of liveEvents) {
+  for (const event of monitorEvents) {
     if (!event?.id) continue;
 
     let eventDetails = event;
