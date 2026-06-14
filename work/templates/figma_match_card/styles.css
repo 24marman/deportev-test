@@ -245,7 +245,6 @@ body {
   border-radius: 50%;
   object-fit: cover;
   background: #d9d9d9;
-  mix-blend-mode: difference;
   z-index: 1;
 }
 
@@ -313,9 +312,9 @@ body {
 
 .scorer-row {
   display: grid;
-  grid-template-columns: 179px 44px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   width: 235px;
   font-family: "Resolve BoldWd", "Arial Narrow", Impact, sans-serif;
   font-weight: 900;
@@ -324,7 +323,7 @@ body {
 }
 
 .scorer-list-away .scorer-row {
-  grid-template-columns: 44px 179px;
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .scorer-list:not(.scorer-list-away) .scorer-name {
@@ -349,6 +348,7 @@ body {
   color: var(--green);
   font-size: 16px;
   line-height: 1;
+  white-space: nowrap;
   mix-blend-mode: difference;
 }
 

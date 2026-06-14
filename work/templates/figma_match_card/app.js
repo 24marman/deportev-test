@@ -74,6 +74,14 @@ function formatScorerName(event, isAway) {
   return isAway ? `${tag} ${player}` : `${player} ${tag}`;
 }
 
+function formatScorerMinute(event) {
+  if (Array.isArray(event.minutes) && event.minutes.length > 0) {
+    return event.minutes.join(", ");
+  }
+
+  return event.minute || "";
+}
+
 function renderScorers(root, data) {
   const scorersBlock = root.querySelector(".scorers");
   const homeScorers = getPath(data, "events.homeScorers") || [];
@@ -88,13 +96,13 @@ function renderScorers(root, data) {
     const isAway = list.classList.contains("scorer-list-away");
     list.innerHTML = "";
 
-    events.slice(0, 4).forEach((event) => {
+    events.forEach((event) => {
       const row = document.createElement("div");
       row.className = "scorer-row";
 
       const minute = document.createElement("span");
       minute.className = "scorer-minute";
-      minute.textContent = event.minute || "";
+      minute.textContent = formatScorerMinute(event);
 
       const name = document.createElement("span");
       name.className = "scorer-name";

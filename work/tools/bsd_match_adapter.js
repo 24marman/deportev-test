@@ -3,35 +3,12 @@
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
+const { getDisplayTeamName, getFlagAssetUrl } = require("../../src/lib/team-metadata");
 
 const API_BASE = "https://sports.bzzoiro.com/api/v2";
 const WORLD_CUP = {
   leagueId: 27,
   seasonId: 188,
-};
-
-const TEAM_ISO2 = {
-  Argentina: "ar",
-  Australia: "au",
-  Brazil: "br",
-  Canada: "ca",
-  Czechia: "cz",
-  Germany: "de",
-  Haiti: "ht",
-  Mexico: "mx",
-  Morocco: "ma",
-  Netherlands: "nl",
-  Paraguay: "py",
-  Qatar: "qa",
-  Scotland: "gb-sct",
-  "South Africa": "za",
-  "South Korea": "kr",
-  Sweden: "se",
-  Switzerland: "ch",
-  "Türkiye": "tr",
-  USA: "us",
-  "Bosnia & Herzegovina": "ba",
-  "Côte d'Ivoire": "ci",
 };
 
 const FIFA_VENUE_NAMES = {
@@ -120,12 +97,11 @@ function getMinute(incident) {
   const base = Number(incident.minute || 0);
   if (!base) return "";
   const added = Number(incident.added_time || 0);
-  return `${base + added}'`;
+  return added > 0 ? `${base}+${added}'` : `${base}'`;
 }
 
 function teamFlag(teamName) {
-  const iso2 = TEAM_ISO2[teamName];
-  return iso2 ? `./assets/flags/${iso2}.svg` : "./assets/home-flag.svg";
+  return getFlagAssetUrl(teamName);
 }
 
 function getDisplayName(playerName) {
@@ -154,15 +130,36 @@ function toScorer(incident) {
 function splitScorers(incidents) {
   const homeScorers = [];
   const awayScorers = [];
+  const homeGroups = new Map();
+  const awayGroups = new Map();
+
+  function pushGrouped(target, groups, scorer) {
+    const key = [scorer.player, scorer.goalType || ""].join("::");
+    const group = groups.get(key);
+    if (group) {
+      group.minutes.push(scorer.minute);
+      group.minute = group.minutes.join(", ");
+      return;
+    }
+
+    const next = {
+      ...scorer,
+      minutes: [scorer.minute].filter(Boolean),
+    };
+    next.minute = next.minutes.join(", ");
+    groups.set(key, next);
+    target.push(next);
+  }
 
   for (const incident of incidents) {
     if (incident.type !== "goal") continue;
     const target = incident.is_home ? homeScorers : awayScorers;
-    target.push(toScorer(incident));
+    const groups = incident.is_home ? homeGroups : awayGroups;
+    pushGrouped(target, groups, toScorer(incident));
   }
 
-  homeScorers.sort((a, b) => parseInt(a.minute, 10) - parseInt(b.minute, 10));
-  awayScorers.sort((a, b) => parseInt(a.minute, 10) - parseInt(b.minute, 10));
+  homeScorers.sort((a, b) => parseInt(a.minutes[0], 10) - parseInt(b.minutes[0], 10));
+  awayScorers.sort((a, b) => parseInt(a.minutes[0], 10) - parseInt(b.minutes[0], 10));
 
   return { homeScorers, awayScorers };
 }
@@ -176,6 +173,7 @@ function toMatchData(event, incidents, venue) {
       eventId: event.id,
       leagueId: WORLD_CUP.leagueId,
       seasonId: WORLD_CUP.seasonId,
+      eventDate: event.event_date || event.start_time || null,
       fetchedAt: new Date().toISOString(),
     },
     competition: {
@@ -197,13 +195,15 @@ function toMatchData(event, incidents, venue) {
     },
     teams: {
       home: {
-        name: event.home_team,
+        name: getDisplayTeamName(event.home_team),
+        providerName: event.home_team,
         score: event.home_score ?? 0,
         id: event.home_team_id,
         flag: teamFlag(event.home_team),
       },
       away: {
-        name: event.away_team,
+        name: getDisplayTeamName(event.away_team),
+        providerName: event.away_team,
         score: event.away_score ?? 0,
         id: event.away_team_id,
         flag: teamFlag(event.away_team),

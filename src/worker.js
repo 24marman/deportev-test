@@ -6,6 +6,7 @@ const { renderMatchCard } = require("./render-match-card");
 const { uploadGeneratedImage } = require("./lib/storage");
 const { loadMonitorState, saveMonitorState } = require("./lib/monitor-state");
 const { findScheduledGroupStageMatch } = require("./lib/world-cup-group-stage-schedule");
+const { buildPriorGroupContext } = require("./social/competition-context");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
@@ -33,6 +34,7 @@ function getOutputName(matchData) {
 async function renderEvent(eventId) {
   console.log(`Fetching BSD event ${eventId}`);
   const matchData = await bsd.fetchMatchData(eventId);
+  await enrichCompetitionContext(matchData);
   const outputName = getOutputName(matchData);
   const outputPath = path.join(generatedDir, outputName);
 
@@ -85,6 +87,22 @@ async function renderEvent(eventId) {
     uploadResult,
     socialResult,
   };
+}
+
+async function enrichCompetitionContext(matchData) {
+  try {
+    const events = await bsd.fetchEvents({
+      date_to: matchData.source?.eventDate || new Date().toISOString().slice(0, 10),
+      limit: 100,
+    });
+
+    matchData.context = {
+      ...(matchData.context || {}),
+      priorGroup: buildPriorGroupContext(matchData, events),
+    };
+  } catch (error) {
+    console.error(`Competition context unavailable: ${error.message}`);
+  }
 }
 
 async function runStartupJob() {
@@ -257,9 +275,11 @@ async function tickMonitor() {
 
     const eventId = String(event.id);
     const record = state.matches[eventId] || {};
+    const sawBeforeThisTick = Boolean(record.firstSeenAt);
     const nextRecord = {
       ...record,
       eventId,
+      firstSeenAt: record.firstSeenAt || now,
       homeTeam: eventDetails.home_team || event.home_team,
       awayTeam: eventDetails.away_team || event.away_team,
       eventDate: eventDetails.event_date || event.event_date || event.start_time || record.eventDate || null,
@@ -280,6 +300,18 @@ async function tickMonitor() {
     state.matches[eventId] = nextRecord;
 
     if (!isFinishedStatus(nextRecord.status)) continue;
+
+    if (!sawBeforeThisTick && !nextRecord.secondHalfStartedAt) {
+      state.matches[eventId] = {
+        ...nextRecord,
+        skippedPastFinalAt: now,
+        processedAt: now,
+        xPublished: false,
+        skipReason: "First seen after final whistle; past matches are never autoposted.",
+      };
+      console.log(`Skipping BSD event ${eventId}; first seen already finished, so it will not be autoposted.`);
+      continue;
+    }
 
     const canProcess =
       !nextRecord.secondHalfStartedAt || minutesSince(nextRecord.secondHalfStartedAt) >= strongDelay;

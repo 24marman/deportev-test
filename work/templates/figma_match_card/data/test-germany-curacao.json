@@ -1,0 +1,47 @@
+{
+  "source": {
+    "provider": "bsd-football-api",
+    "eventId": 8295,
+    "leagueId": 27,
+    "seasonId": 188,
+    "fetchedAt": "2026-06-14T22:33:09.011Z"
+  },
+  "competition": {
+    "name": "COPA MUNDIAL",
+    "year": "2026",
+    "phase": "FASE DE GRUPOS",
+    "groupLetter": "E",
+    "matchdayNumber": "1"
+  },
+  "match": {
+    "status": "FINAL",
+    "venue": {
+      "name": "HOUSTON STADIUM",
+      "image": "./assets/stadium.png"
+    }
+  },
+  "teams": {
+    "home": {
+      "name": "Alemania",
+      "score": 7,
+      "flag": "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/1x1/de.svg"
+    },
+    "away": {
+      "name": "Curazao",
+      "score": 1,
+      "flag": "https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/1x1/cw.svg"
+    }
+  },
+  "events": {
+    "homeScorers": [
+      { "minute": "6', 45+3'", "minutes": ["6'", "45+3'"], "player": "Nmecha" },
+      { "minute": "38'", "minutes": ["38'"], "player": "Schlotterbeck" },
+      { "minute": "47', 90+2'", "minutes": ["47'", "90+2'"], "player": "Musiala" },
+      { "minute": "50'", "minutes": ["50'"], "player": "Havertz", "goalType": "penalty" },
+      { "minute": "77'", "minutes": ["77'"], "player": "Wirtz" }
+    ],
+    "awayScorers": [
+      { "minute": "21'", "minutes": ["21'"], "player": "Comenencia" }
+    ]
+  }
+}
