@@ -30,7 +30,7 @@ Esta auditoria sirve como puente entre Figma, el renderizador y el futuro bot de
 | Marco de banderas | Aro verde/negro alrededor de cada bandera | Fijo | `assets/flag-border.svg` | No cambia por equipo. |
 | Marcador | Centro de la card, numeros grandes | Dinamico | `teams.home.score`, `teams.away.score` | Parametrizado. El guion central verde es fijo. |
 | Status del partido | Encima del marcador | Dinamico | `match.status` | Puede ser FINAL, EN VIVO, HT, etc. |
-| Goleadores | Debajo del marcador, dos columnas | Dinamico | `events.homeScorers`, `events.awayScorers` | Renderiza filas con minuto verde `00'` y jugador. Soporta gol normal, penal y autogol. Actualmente limita a 4 por lado. |
+| Goleadores | Debajo del marcador, dos columnas | Dinamico | `events.homeScorers`, `events.awayScorers` | Renderiza filas con minuto verde `00'` y jugador. Soporta gol normal, penal y autogol. No debe recortar goles; si un jugador marca varias veces, agrupa sus minutos en una sola fila. |
 | Separador de goleadores | Linea vertical verde entre columnas | Dinamico visual | CSS + altura de listas | No es altura fija. Crece o se encoge segun la lista visible de anotadores. |
 | Venue name | Parte inferior, sobre logo publisher | Dinamico | `match.venue.name` | Parametrizado. Siempre va en verde. El icono de estadio es fijo. |
 | Icono de estadio | Encima del venue name | Fijo | `assets/stadium-icon.svg` | No cambia por venue. |
@@ -81,13 +81,13 @@ Cada evento de gol debe poder incluir:
 Valores permitidos:
 
 - Sin `goalType`: gol normal.
-- `penalty`: mostrar `(Pen)`.
-- `ownGoal`: mostrar `(OG)`.
+- `penalty`: mostrar `(P)`.
+- `ownGoal`: mostrar `(AG)`.
 
 Regla visual:
 
-- Lado izquierdo: `JUGADOR UNO (Pen) 73'`.
-- Lado derecho: `73' (Pen) JUGADOR UNO`.
+- Lado izquierdo: `JUGADOR UNO (P) 73'`.
+- Lado derecho: `73' (P) JUGADOR UNO`.
 - Los minutos quedan cerca de la linea central.
 
 La etiqueta debe quedar siempre junto al nombre, nunca separada del bloque del jugador.

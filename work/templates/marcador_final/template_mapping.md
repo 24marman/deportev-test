@@ -111,11 +111,11 @@ Para automatizacion conviene reconstruir este template como:
 
 - Si el nombre del equipo es largo, reducir tamano de fuente o usar version corta.
 - Si no hay goleadores de un lado, ocultar la columna correspondiente.
-- Si hay demasiados goleadores, limitar filas visibles y usar resumen, por ejemplo `+2`.
-- Si el gol fue penal, agregar `(Pen)` junto al nombre.
-- Si el gol fue autogol, agregar `(OG)` junto al nombre.
-- En columna izquierda, la etiqueta va despues del nombre: `Jugador Uno (Pen)`.
-- En columna derecha, la etiqueta va antes del nombre: `(Pen) Jugador Uno`.
+- Si hay muchos goles, conservar todos los goles agrupando los minutos por jugador cuando aplique.
+- Si el gol fue penal, agregar `(P)` junto al nombre.
+- Si el gol fue autogol, agregar `(AG)` junto al nombre.
+- En columna izquierda, la etiqueta va despues del nombre: `Jugador Uno (P)`.
+- En columna derecha, la etiqueta va antes del nombre: `(P) Jugador Uno`.
 - El marcador debe soportar uno o dos digitos.
 - El estado debe soportar `Final`, `En vivo`, `Medio tiempo`, `Previa`, `Penales`.
 - Escudos o banderas deben recortarse dentro de los circulos.

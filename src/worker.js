@@ -11,6 +11,7 @@ const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-p
 const bsd = require("../work/tools/bsd_match_adapter");
 
 const generatedDir = path.join("outputs", "generated");
+const DEFAULT_AUTOPOST_NOT_BEFORE = "2026-06-14T23:00:00.000Z";
 
 function slug(value) {
   return String(value || "")
@@ -142,6 +143,23 @@ function minutesSince(isoDate) {
 function getMonitorIntervalMs() {
   const seconds = Number(process.env.MONITOR_POLL_SECONDS || "120");
   return Math.max(30, seconds) * 1000;
+}
+
+function getAutopostNotBeforeMs() {
+  const value = process.env.AUTOPOST_NOT_BEFORE || DEFAULT_AUTOPOST_NOT_BEFORE;
+  const time = new Date(value).getTime();
+
+  if (Number.isFinite(time)) return time;
+
+  return new Date(DEFAULT_AUTOPOST_NOT_BEFORE).getTime();
+}
+
+function getEventStartMs(recordOrEvent) {
+  const value = recordOrEvent.eventDate || recordOrEvent.event_date || recordOrEvent.start_time;
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
 function getStrongMonitorDelayMinutes() {
@@ -291,6 +309,24 @@ async function tickMonitor() {
       lastCheckedAt: now,
       checkCount: (record.checkCount || 0) + 1,
     };
+
+    const eventStartMs = getEventStartMs(nextRecord);
+    const autopostNotBeforeMs = getAutopostNotBeforeMs();
+
+    if (eventStartMs && eventStartMs < autopostNotBeforeMs) {
+      state.matches[eventId] = {
+        ...nextRecord,
+        skippedBeforeCutoffAt: now,
+        processedAt: now,
+        xPublished: false,
+        skipReason: `Event starts before autopost cutoff ${new Date(autopostNotBeforeMs).toISOString()}.`,
+      };
+      console.log(
+        `Skipping BSD event ${eventId}; event starts before autopost cutoff ` +
+          `${new Date(autopostNotBeforeMs).toISOString()}.`,
+      );
+      continue;
+    }
 
     if (!nextRecord.secondHalfStartedAt && isSecondHalfStatus(nextRecord.status)) {
       nextRecord.secondHalfStartedAt = now;

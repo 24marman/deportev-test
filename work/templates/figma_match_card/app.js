@@ -62,8 +62,8 @@ function setAssetBindings(root, data) {
 }
 
 function getGoalTag(event) {
-  if (event.goalType === "penalty") return "(Pen)";
-  if (event.goalType === "ownGoal") return "(OG)";
+  if (event.goalType === "penalty") return "(P)";
+  if (event.goalType === "ownGoal") return "(AG)";
   return "";
 }
 
