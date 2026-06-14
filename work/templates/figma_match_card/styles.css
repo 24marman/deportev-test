@@ -1,0 +1,412 @@
+:root {
+  --green: #059946;
+  --green-deep: #005a2c;
+  --white: #f5f3f4;
+  --canvas-width: 1080px;
+  --canvas-height: 1350px;
+}
+
+@font-face {
+  font-family: "Resolve RegularWd";
+  src: url("./assets/fonts/Resolve-RegularWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve SemiboldWd";
+  src: url("./assets/fonts/Resolve-SemiboldWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve BoldWd";
+  src: url("./assets/fonts/Resolve-BoldWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve BoldCn";
+  src: url("./assets/fonts/Resolve-BoldCn.otf") format("opentype");
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #0b0d0c;
+  color: var(--white);
+  font-family: "Resolve BoldWd", "Arial Black", "Arial Narrow", Impact, system-ui, sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.match-card {
+  position: relative;
+  width: var(--canvas-width);
+  height: var(--canvas-height);
+  overflow: hidden;
+  background: #000;
+  isolation: isolate;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.stadium-bg {
+  position: absolute;
+  inset: -78px 0 auto 0;
+  width: 1079px;
+  height: 1620px;
+  object-fit: cover;
+  opacity: 0.7;
+  z-index: 0;
+}
+
+.lights-layer {
+  position: absolute;
+  inset: 0;
+  width: 1080px;
+  height: 1350px;
+  object-fit: cover;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.texture-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 3% 3%, rgba(255, 255, 255, 0.38), transparent 8%),
+    radial-gradient(circle at 97% 3%, rgba(255, 255, 255, 0.34), transparent 8%),
+    radial-gradient(circle at 50% 48%, rgba(5, 153, 70, 0.14), transparent 18%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.32));
+  mix-blend-mode: screen;
+}
+
+.green-glow {
+  position: absolute;
+  left: 0;
+  top: 885px;
+  width: 1080px;
+  height: 465px;
+  background: var(--green-deep);
+  filter: blur(250px);
+  mix-blend-mode: color;
+  z-index: 2;
+}
+
+.green-glow-b {
+  opacity: 0.75;
+}
+
+.card-header {
+  position: absolute;
+  top: 135px;
+  left: 50px;
+  width: 980px;
+  z-index: 5;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.worldcup-logo {
+  display: block;
+  width: 90px;
+  height: 140px;
+  object-fit: contain;
+  margin: 0 auto 5px;
+  mix-blend-mode: screen;
+}
+
+.tournament {
+  margin: 0;
+  font-family: "Resolve BoldWd", "Arial Black", sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 7.2px;
+  font-weight: 900;
+  mix-blend-mode: difference;
+}
+
+.tournament strong {
+  color: var(--green);
+}
+
+.card-header h1 {
+  margin: 15px 0;
+  font-size: 60px;
+  line-height: 1;
+  letter-spacing: 3px;
+  font-style: italic;
+  font-weight: 950;
+  mix-blend-mode: difference;
+}
+
+.subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  min-height: 30px;
+}
+
+.subtitle img {
+  width: 100px;
+  height: 6px;
+  object-fit: fill;
+  mix-blend-mode: difference;
+}
+
+.subtitle-right {
+  transform: rotate(180deg) scaleY(-1);
+}
+
+.subtitle p {
+  margin: 0;
+  font-family: "Resolve BoldWd", "Arial Black", sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 7.2px;
+  font-weight: 900;
+  white-space: nowrap;
+  mix-blend-mode: difference;
+}
+
+.subtitle strong {
+  color: var(--green);
+  margin: 0 10px;
+}
+
+.scoreboard {
+  position: absolute;
+  z-index: 6;
+  top: 518px;
+  left: 50px;
+  width: 980px;
+  height: 350px;
+  display: grid;
+  grid-template-columns: 300px 380px 300px;
+  align-items: start;
+}
+
+.team {
+  position: relative;
+  height: 305px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.team h2,
+.status {
+  margin: 0;
+  font-family: "Resolve BoldWd", "Arial Black", sans-serif;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 1.5px;
+  font-weight: 900;
+  text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+  mix-blend-mode: difference;
+}
+
+.flag-frame {
+  position: absolute;
+  top: 81px;
+  left: 30px;
+  width: 240px;
+  height: 240px;
+  display: grid;
+  place-items: center;
+  mix-blend-mode: difference;
+}
+
+.flag-border {
+  position: absolute;
+  inset: -6px -10px -15px;
+  width: calc(100% + 20px);
+  height: calc(100% + 21px);
+  mix-blend-mode: difference;
+  z-index: 2;
+}
+
+.team-flag {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #d9d9d9;
+  mix-blend-mode: difference;
+  z-index: 1;
+}
+
+.score {
+  height: 305px;
+  text-align: center;
+}
+
+.scoreline {
+  margin-top: 7px;
+  height: 277px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: "Resolve BoldCn", Impact, "Arial Black", sans-serif;
+  font-size: 300px;
+  line-height: 0.9;
+  letter-spacing: -12px;
+  color: var(--white);
+  mix-blend-mode: difference;
+}
+
+.scoreline strong {
+  color: var(--green);
+  font-size: 300px;
+  transform: translateY(-10px);
+}
+
+.scorers {
+  position: absolute;
+  left: 50%;
+  top: 886px;
+  width: 492px;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: 235px 2px 235px;
+  align-items: stretch;
+  gap: 10px;
+  mix-blend-mode: difference;
+  transform: translateX(-50%);
+}
+
+.scorer-divider {
+  width: 2px;
+  min-height: 0;
+  background: var(--green);
+  mix-blend-mode: difference;
+}
+
+.scorers.is-empty {
+  display: none;
+}
+
+.scorer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.scorer-list-away {
+  align-items: flex-end;
+}
+
+.scorer-row {
+  display: grid;
+  grid-template-columns: 179px 44px;
+  align-items: center;
+  gap: 12px;
+  width: 235px;
+  font-family: "Resolve BoldWd", "Arial Narrow", Impact, sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.scorer-list-away .scorer-row {
+  grid-template-columns: 44px 179px;
+}
+
+.scorer-list:not(.scorer-list-away) .scorer-name {
+  justify-self: end;
+  text-align: right;
+}
+
+.scorer-list:not(.scorer-list-away) .scorer-minute {
+  justify-self: start;
+}
+
+.scorer-list-away .scorer-name {
+  justify-self: start;
+  text-align: left;
+}
+
+.scorer-list-away .scorer-minute {
+  justify-self: end;
+}
+
+.scorer-minute {
+  color: var(--green);
+  font-size: 16px;
+  line-height: 1;
+  mix-blend-mode: difference;
+}
+
+.scorer-name {
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  mix-blend-mode: difference;
+}
+
+.venue {
+  position: absolute;
+  z-index: 6;
+  left: 50px;
+  top: 1059px;
+  width: 980px;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--green);
+  text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+  mix-blend-mode: exclusion;
+}
+
+.venue img {
+  width: 38px;
+  height: 42px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 18px;
+  mix-blend-mode: exclusion;
+}
+
+.venue p {
+  margin: 0;
+  font-family: "Resolve SemiboldWd", "Arial Black", sans-serif;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 1.2px;
+  font-weight: 900;
+}
+
+.publisher-logo {
+  position: absolute;
+  z-index: 6;
+  left: 440px;
+  top: 1175px;
+  width: 200px;
+  height: 40px;
+  object-fit: contain;
+}
+
+@media (max-width: 1128px) {
+  .page {
+    padding: 0;
+    overflow: auto;
+  }
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Match Card Template</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="match-card" id="match-card" aria-label="Match result card">
+        <img class="stadium-bg" data-bind-asset="venue.image" src="./assets/stadium.png" alt="" />
+        <img class="lights-layer" src="./assets/lights.png" alt="" />
+        <div class="texture-overlay"></div>
+        <div class="green-glow green-glow-a"></div>
+        <div class="green-glow green-glow-b"></div>
+
+        <header class="card-header">
+          <img class="worldcup-logo" src="./assets/worldcup-logo.svg" alt="" />
+          <p class="tournament">
+            <span data-bind="competition.name">COPA MUNDIAL</span>
+            <strong data-bind="competition.year">2026</strong>
+          </p>
+          <h1 data-bind="competition.phase">FASE DE GRUPOS</h1>
+          <div class="subtitle">
+            <img src="./assets/subtitle-left.svg" alt="" />
+            <p>
+              <span>GRUPO </span><span data-bind="competition.groupLetter">B</span>
+              <strong>•</strong>
+              <span>JORNADA </span><span data-bind="competition.matchdayNumber">1</span>
+            </p>
+            <img class="subtitle-right" src="./assets/subtitle-right.svg" alt="" />
+          </div>
+        </header>
+
+        <section class="scoreboard">
+          <article class="team team-home">
+            <h2 data-bind="teams.home.name">HOME</h2>
+            <div class="flag-frame">
+              <img class="flag-border" src="./assets/flag-border.svg" alt="" />
+              <img class="team-flag" data-bind-asset="teams.home.flag" src="./assets/home-flag.svg" alt="" />
+            </div>
+          </article>
+
+          <article class="score">
+            <p class="status" data-bind="match.status">FINAL</p>
+            <div class="scoreline">
+              <span data-bind="teams.home.score">0</span>
+              <strong>-</strong>
+              <span data-bind="teams.away.score">0</span>
+            </div>
+          </article>
+
+          <article class="team team-away">
+            <h2 data-bind="teams.away.name">AWAY</h2>
+            <div class="flag-frame">
+              <img class="flag-border" src="./assets/flag-border.svg" alt="" />
+              <img class="team-flag" data-bind-asset="teams.away.flag" src="./assets/away-flag.svg" alt="" />
+            </div>
+          </article>
+        </section>
+
+        <section class="scorers" aria-label="Goal scorers">
+          <div class="scorer-list" data-bind-list="events.homeScorers"></div>
+          <div class="scorer-divider"></div>
+          <div class="scorer-list scorer-list-away" data-bind-list="events.awayScorers"></div>
+        </section>
+
+        <footer class="venue">
+          <img src="./assets/stadium-icon.svg" alt="" />
+          <p data-bind="match.venue.name">SAN FRANCISCO BAY AREA STADIUM</p>
+        </footer>
+
+        <img class="publisher-logo" src="./assets/deportev-logo.svg" alt="Deportev" />
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

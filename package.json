@@ -1,0 +1,22 @@
+{
+  "name": "mundial-2026-content-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generador automatico de imagenes WebP para contenidos del Mundial 2026.",
+  "main": "src/worker.js",
+  "scripts": {
+    "start": "node src/worker.js",
+    "dev": "node src/server.js",
+    "render:demo": "node src/render-match-card.js --data work/templates/figma_match_card/data/current-match.json --out outputs/generated/demo.webp",
+    "bsd:match": "node work/tools/bsd_match_adapter.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.50.0",
+    "dotenv": "16.4.7",
+    "playwright": "1.49.1",
+    "sharp": "0.33.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

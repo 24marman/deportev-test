@@ -1,0 +1,55 @@
+{
+  "source": {
+    "provider": "bsd-football-api",
+    "eventId": 8293,
+    "leagueId": 27,
+    "seasonId": 188,
+    "mode": "simulated-final",
+    "fetchedAt": "2026-06-13T23:50:00.000Z"
+  },
+  "competition": {
+    "name": "COPA MUNDIAL",
+    "year": "2026",
+    "phase": "FASE DE GRUPOS",
+    "groupLetter": "C",
+    "matchdayNumber": "1"
+  },
+  "match": {
+    "status": "FINAL",
+    "venue": {
+      "name": "New York New Jersey Stadium",
+      "providerName": "MetLife Stadium",
+      "city": "East Rutherford",
+      "country": "USA",
+      "image": "./assets/stadium.png"
+    }
+  },
+  "teams": {
+    "home": {
+      "name": "Brazil",
+      "score": 1,
+      "id": 463,
+      "flag": "./assets/flags/br.svg"
+    },
+    "away": {
+      "name": "Morocco",
+      "score": 1,
+      "id": 464,
+      "flag": "./assets/flags/ma.svg"
+    }
+  },
+  "events": {
+    "homeScorers": [
+      {
+        "minute": "32'",
+        "player": "Vinícius Jr."
+      }
+    ],
+    "awayScorers": [
+      {
+        "minute": "21'",
+        "player": "Saibari"
+      }
+    ]
+  }
+}
