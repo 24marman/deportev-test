@@ -95,3 +95,12 @@ Los blend modes de Figma pueden replicarse en HTML/CSS con propiedades como:
 - `mix-blend-mode: color`.
 
 La auditoria debe revisar no solo que la propiedad exista, sino que la capa este ubicada sobre el fondo correcto y que no haya un stacking context que cambie el resultado visual.
+
+## Reglas Para SVG Y Blend Modes En Render Final
+
+- Logos, iconos, escudos y simbolos oficiales deben conservar proporciones con `object-fit: contain` y SVG `preserveAspectRatio="xMidYMid meet"`.
+- Solo ornamentos abstractos, lineas decorativas, mascaras o fondos pueden usar `preserveAspectRatio="none"`.
+- Si un SVG contiene `mix-blend-mode` interno, el agente debe validar si conviene mover el blend mode al wrapper HTML para que el navegador lo mezcle contra el fondo correcto.
+- El checklist no se aprueba por revisar CSS solamente: debe compararse el WebP final contra el frame/export de Figma.
+- Los elementos con `difference` deben revisarse sobre el fondo real del partido, porque sobre zonas casi negras el efecto puede verse casi identico al color original.
+- Si el render de Playwright/WebP no coincide con Figma, el agente debe proponer una estrategia de fidelidad: ajustar stacking context, rasterizar capas fijas desde Figma, inline SVG, o postproceso controlado.
