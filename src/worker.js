@@ -5,6 +5,7 @@ const { server } = require("./server");
 const { renderMatchCard } = require("./render-match-card");
 const { uploadGeneratedImage } = require("./lib/storage");
 const { loadMonitorState, saveMonitorState } = require("./lib/monitor-state");
+const { findScheduledGroupStageMatch } = require("./lib/world-cup-group-stage-schedule");
 const { publishFinalScorePost } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
@@ -163,7 +164,13 @@ async function tickMonitor() {
   console.log(`Monitor checked ${liveEvents.length} live BSD events.`);
 
   for (const event of liveEvents) {
-    if (!event?.id || !isGroupStageEvent(event)) continue;
+    if (!event?.id) continue;
+
+    const scheduledMatch = findScheduledGroupStageMatch(event);
+    if (!isGroupStageEvent(event) || !scheduledMatch) {
+      console.log(`Skipping BSD event ${event.id}; not in World Cup 2026 group-stage schedule.`);
+      continue;
+    }
 
     const eventId = String(event.id);
     const record = state.matches[eventId] || {};
@@ -174,7 +181,9 @@ async function tickMonitor() {
       awayTeam: event.away_team,
       eventDate: event.event_date || event.start_time || record.eventDate || null,
       groupName: event.group_name || record.groupName || null,
-      roundNumber: event.round_number || record.roundNumber || null,
+      roundNumber: event.round_number || scheduledMatch.matchday || record.roundNumber || null,
+      scheduledDate: scheduledMatch.date,
+      scheduledVenue: scheduledMatch.venue,
       status: event.status,
       lastCheckedAt: now,
       checkCount: (record.checkCount || 0) + 1,
