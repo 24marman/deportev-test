@@ -97,5 +97,6 @@ outputs/generated/{fecha}_{grupo}_{home}-{score}-{away}.webp
 - Worker arranca correctamente.
 - Dockerfile listo para Railway.
 - Supabase upload preparado, pendiente de poner variables reales.
+- Si el bucket de Supabase no existe, el worker intentara crearlo automaticamente como bucket publico para WebP.
 - Monitor automatico completo pendiente de persistir estado en Supabase.
 - Bot de X/Twitter pendiente del acceso developer/API de X.

@@ -18,6 +18,28 @@ function getSupabaseClient() {
   });
 }
 
+async function ensureBucket(client, bucket) {
+  const { data: buckets, error: listError } = await client.storage.listBuckets();
+
+  if (listError) {
+    throw listError;
+  }
+
+  if (buckets.some((item) => item.name === bucket)) {
+    return;
+  }
+
+  const { error: createError } = await client.storage.createBucket(bucket, {
+    public: true,
+    fileSizeLimit: 10485760,
+    allowedMimeTypes: ["image/webp"],
+  });
+
+  if (createError) {
+    throw createError;
+  }
+}
+
 async function uploadGeneratedImage(filePath, destinationPath) {
   const client = getSupabaseClient();
   const bucket = process.env.SUPABASE_BUCKET || "generated-images";
@@ -28,6 +50,8 @@ async function uploadGeneratedImage(filePath, destinationPath) {
       reason: "Supabase variables are not configured.",
     };
   }
+
+  await ensureBucket(client, bucket);
 
   const body = fs.readFileSync(filePath);
   const objectPath = destinationPath || path.basename(filePath);
