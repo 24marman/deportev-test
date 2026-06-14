@@ -41,7 +41,16 @@ async function renderEvent(eventId) {
     quality: Number(process.env.RENDER_QUALITY || "88"),
   });
 
-  const uploadResult = await uploadGeneratedImage(outputPath, outputName);
+  let uploadResult;
+  try {
+    uploadResult = await uploadGeneratedImage(outputPath, outputName);
+  } catch (error) {
+    uploadResult = {
+      uploaded: false,
+      reason: error.message,
+    };
+  }
+
   console.log(
     uploadResult.uploaded
       ? `Uploaded ${uploadResult.publicUrl}`

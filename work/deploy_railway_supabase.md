@@ -98,5 +98,6 @@ outputs/generated/{fecha}_{grupo}_{home}-{score}-{away}.webp
 - Dockerfile listo para Railway.
 - Supabase upload preparado, pendiente de poner variables reales.
 - Si el bucket de Supabase no existe, el worker intentara crearlo automaticamente como bucket publico para WebP.
+- Si Supabase bloquea el upload por RLS o credenciales, el worker no debe fallar: conserva el WebP localmente y continua con el flujo social.
 - Monitor automatico completo pendiente de persistir estado en Supabase.
 - Bot de X/Twitter pendiente del acceso developer/API de X.
