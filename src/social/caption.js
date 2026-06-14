@@ -42,6 +42,17 @@ function buildFinalScoreCaption(matchData) {
   ].join("\n");
 }
 
+function buildContextualFinalScoreCaption(matchData, context) {
+  const base = buildFinalScoreCaption(matchData);
+  const headline = String(context?.headline || "").trim();
+
+  if (!headline) return base;
+
+  return `${headline}\n\n${base}`;
+}
+
 module.exports = {
   buildFinalScoreCaption,
+  buildContextualFinalScoreCaption,
+  normalizeTeamName,
 };

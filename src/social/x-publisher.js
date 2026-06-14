@@ -1,6 +1,7 @@
 const fs = require("fs");
 const { TwitterApi } = require("twitter-api-v2");
-const { buildFinalScoreCaption } = require("./caption");
+const { buildContextualFinalScoreCaption } = require("./caption");
+const { getInternalContext } = require("./match-context");
 
 function getPostMode() {
   return process.env.X_POST_MODE || "manual";
@@ -54,7 +55,8 @@ async function publishFinalScorePost({ matchData, imagePath }) {
   validatePostInput({ matchData, imagePath });
 
   const mode = getPostMode();
-  const text = buildFinalScoreCaption(matchData);
+  const context = getInternalContext(matchData);
+  const text = buildContextualFinalScoreCaption(matchData, context);
 
   if (mode === "paused") {
     return {
@@ -103,6 +105,6 @@ async function publishFinalScorePost({ matchData, imagePath }) {
 }
 
 module.exports = {
-  buildFinalScoreCaption,
+  buildFinalScoreCaption: (matchData) => buildContextualFinalScoreCaption(matchData, getInternalContext(matchData)),
   publishFinalScorePost,
 };
