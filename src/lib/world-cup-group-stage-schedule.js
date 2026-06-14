@@ -121,7 +121,7 @@ function findScheduledGroupStageMatch(event) {
   const away = normalizeTeamKey(event.away_team || event.teams?.away?.name);
 
   return GROUP_STAGE_SCHEDULE.find((match) => {
-    if (match.group !== eventGroup) return false;
+    if (eventGroup && match.group !== eventGroup) return false;
 
     const scheduledHome = normalizeTeamKey(match.home);
     const scheduledAway = normalizeTeamKey(match.away);

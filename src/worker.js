@@ -6,7 +6,7 @@ const { renderMatchCard } = require("./render-match-card");
 const { uploadGeneratedImage } = require("./lib/storage");
 const { loadMonitorState, saveMonitorState } = require("./lib/monitor-state");
 const { findScheduledGroupStageMatch } = require("./lib/world-cup-group-stage-schedule");
-const { publishFinalScorePost } = require("./social/x-publisher");
+const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
 const generatedDir = path.join("outputs", "generated");
@@ -95,7 +95,7 @@ function isGroupStageEvent(event) {
   const roundName = String(event.round_name || "").toLowerCase();
   const knockoutTerms = ["round of", "quarter", "semi", "final", "third", "16", "32"];
 
-  return Boolean(groupName) && !knockoutTerms.some((term) => roundName.includes(term));
+  return !knockoutTerms.some((term) => roundName.includes(term));
 }
 
 function isSecondHalfStatus(status) {
@@ -166,9 +166,23 @@ async function tickMonitor() {
   for (const event of liveEvents) {
     if (!event?.id) continue;
 
-    const scheduledMatch = findScheduledGroupStageMatch(event);
-    if (!isGroupStageEvent(event) || !scheduledMatch) {
-      console.log(`Skipping BSD event ${event.id}; not in World Cup 2026 group-stage schedule.`);
+    let eventDetails = event;
+    let scheduledMatch = findScheduledGroupStageMatch(eventDetails);
+
+    if (!scheduledMatch || !eventDetails.group_name || !eventDetails.round_name) {
+      try {
+        eventDetails = await bsd.fetchEvent(event.id);
+        scheduledMatch = findScheduledGroupStageMatch(eventDetails);
+      } catch (error) {
+        console.error(`Could not fetch BSD event ${event.id} details: ${error.message}`);
+      }
+    }
+
+    if (!isGroupStageEvent(eventDetails) || !scheduledMatch) {
+      console.log(
+        `Skipping BSD event ${event.id}; not in World Cup 2026 group-stage schedule ` +
+          `(${event.home_team || eventDetails.home_team || "unknown"} vs ${event.away_team || eventDetails.away_team || "unknown"}).`,
+      );
       continue;
     }
 
@@ -177,26 +191,26 @@ async function tickMonitor() {
     const nextRecord = {
       ...record,
       eventId,
-      homeTeam: event.home_team,
-      awayTeam: event.away_team,
-      eventDate: event.event_date || event.start_time || record.eventDate || null,
-      groupName: event.group_name || record.groupName || null,
-      roundNumber: event.round_number || scheduledMatch.matchday || record.roundNumber || null,
+      homeTeam: eventDetails.home_team || event.home_team,
+      awayTeam: eventDetails.away_team || event.away_team,
+      eventDate: eventDetails.event_date || event.event_date || event.start_time || record.eventDate || null,
+      groupName: eventDetails.group_name || event.group_name || scheduledMatch.group || record.groupName || null,
+      roundNumber: eventDetails.round_number || event.round_number || scheduledMatch.matchday || record.roundNumber || null,
       scheduledDate: scheduledMatch.date,
       scheduledVenue: scheduledMatch.venue,
-      status: event.status,
+      status: eventDetails.status || event.status,
       lastCheckedAt: now,
       checkCount: (record.checkCount || 0) + 1,
     };
 
-    if (!nextRecord.secondHalfStartedAt && isSecondHalfStatus(event.status)) {
+    if (!nextRecord.secondHalfStartedAt && isSecondHalfStatus(nextRecord.status)) {
       nextRecord.secondHalfStartedAt = now;
       console.log(`BSD event ${eventId} entered second half.`);
     }
 
     state.matches[eventId] = nextRecord;
 
-    if (!isFinishedStatus(event.status)) continue;
+    if (!isFinishedStatus(nextRecord.status)) continue;
 
     const canProcess =
       !nextRecord.secondHalfStartedAt || minutesSince(nextRecord.secondHalfStartedAt) >= strongDelay;
@@ -212,6 +226,16 @@ async function tickMonitor() {
   await saveMonitorState(state);
 }
 
+async function logXAccountStatus() {
+  const account = await verifyXPublisherAccount();
+  if (account.ok) {
+    console.log(`X publisher connected as @${account.username} (${account.name}); mode=${account.mode}.`);
+    return;
+  }
+
+  console.error(`X publisher verification failed; mode=${account.mode}; reason=${account.reason}`);
+}
+
 async function runMonitorLoop() {
   if (process.env.MONITOR_ENABLED !== "true") {
     console.log("Monitor disabled. Set MONITOR_ENABLED=true in Railway when ready.");
@@ -220,6 +244,7 @@ async function runMonitorLoop() {
 
   const intervalMs = getMonitorIntervalMs();
   console.log(`Monitor loop active. Polling BSD every ${intervalMs / 1000} seconds.`);
+  await logXAccountStatus();
 
   await tickMonitor().catch((error) => {
     console.error(`Monitor tick failed: ${error.message}`);

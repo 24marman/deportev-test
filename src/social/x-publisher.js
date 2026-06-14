@@ -85,8 +85,9 @@ async function publishFinalScorePost({ matchData, imagePath }) {
     throw new Error("Missing X/Twitter credentials.");
   }
 
-  const mediaId = await client.v1.uploadMedia(imagePath, {
-    mimeType: "image/webp",
+  const mediaId = await client.v2.uploadMedia(fs.readFileSync(imagePath), {
+    media_type: "image/webp",
+    media_category: "tweet_image",
   });
   const tweet = await client.v2.tweet({
     text,
@@ -104,7 +105,38 @@ async function publishFinalScorePost({ matchData, imagePath }) {
   };
 }
 
+async function verifyXPublisherAccount() {
+  const mode = getPostMode();
+
+  if (!hasXCredentials()) {
+    return {
+      ok: false,
+      mode,
+      reason: "Missing X/Twitter credentials.",
+    };
+  }
+
+  try {
+    const client = getXClient();
+    const me = await client.v2.me();
+    return {
+      ok: true,
+      mode,
+      id: me.data.id,
+      username: me.data.username,
+      name: me.data.name,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      mode,
+      reason: error.message,
+    };
+  }
+}
+
 module.exports = {
   buildFinalScoreCaption: (matchData) => buildContextualFinalScoreCaption(matchData, getInternalContext(matchData)),
   publishFinalScorePost,
+  verifyXPublisherAccount,
 };
