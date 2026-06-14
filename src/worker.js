@@ -4,6 +4,7 @@ const path = require("path");
 const { server } = require("./server");
 const { renderMatchCard } = require("./render-match-card");
 const { uploadGeneratedImage } = require("./lib/storage");
+const { publishFinalScorePost } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
 const generatedDir = path.join("outputs", "generated");
@@ -47,10 +48,21 @@ async function renderEvent(eventId) {
       : `Skipped upload: ${uploadResult.reason}`,
   );
 
+  const socialResult = await publishFinalScorePost({
+    matchData,
+    imagePath: outputPath,
+  });
+  console.log(
+    socialResult.published
+      ? `Published ${socialResult.tweetUrl}`
+      : `X post not published: ${socialResult.reason}`,
+  );
+
   return {
     matchData,
     outputPath,
     uploadResult,
+    socialResult,
   };
 }
 

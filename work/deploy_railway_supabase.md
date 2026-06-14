@@ -48,6 +48,14 @@ X_ACCESS_TOKEN=...
 X_ACCESS_TOKEN_SECRET=...
 ```
 
+Modo inicial recomendado:
+
+```env
+X_POST_MODE=manual
+```
+
+Cambiar a `auto` solo cuando ya confirmemos que la cuenta de X tiene permisos de escritura y media upload.
+
 ## Comandos Locales
 
 Instalar dependencias:
