@@ -89,7 +89,7 @@ function getFlagEmoji(name) {
 function getFlagAssetUrl(name) {
   const { iso2 } = getTeamMetadata(name);
   if (!iso2) return "./assets/home-flag.svg";
-  return `https://cdn.jsdelivr.net/gh/lipis/flag-icons/flags/1x1/${iso2}.svg`;
+  return `./assets/flags/${iso2}.svg`;
 }
 
 module.exports = {
