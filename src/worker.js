@@ -7,6 +7,11 @@ const { uploadGeneratedImage } = require("./lib/storage");
 const { loadMonitorState, saveMonitorState } = require("./lib/monitor-state");
 const { findScheduledGroupStageMatch } = require("./lib/world-cup-group-stage-schedule");
 const { buildPriorGroupContext } = require("./social/competition-context");
+const {
+  applyWarmEditorialContext,
+  shouldWarmEditorialContext,
+  warmEditorialContext,
+} = require("./social/editorial-context-cache");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
@@ -43,7 +48,10 @@ function logDuration(label, startedAt) {
 async function renderEvent(eventId, options = {}) {
   const startedAt = nowMs();
   console.log(`Fetching BSD event ${eventId}`);
-  const matchData = await bsd.fetchMatchData(eventId);
+  const matchData = await bsd.fetchMatchData(eventId, {
+    skipEditorialExtras: Boolean(options.warmedRecord?.editorialContext),
+  });
+  applyWarmEditorialContext(matchData, options.warmedRecord);
   logDuration(`Fetch BSD event ${eventId}`, startedAt);
 
   const contextStartedAt = nowMs();
@@ -265,7 +273,10 @@ async function processFinishedEvent(event, state, contextEvents) {
   };
   await saveMonitorState(state);
 
-  const result = await renderEvent(eventId, { contextEvents });
+  const result = await renderEvent(eventId, {
+    contextEvents,
+    warmedRecord: state.matches[eventId],
+  });
 
   state.matches[eventId] = {
     ...state.matches[eventId],
@@ -280,6 +291,43 @@ async function processFinishedEvent(event, state, contextEvents) {
 
   await saveMonitorState(state);
   console.log(`Processed final BSD event ${eventId}`);
+  return state;
+}
+
+async function maybeWarmEditorialContext(eventId, state, contextEvents) {
+  const record = state.matches[eventId] || {};
+
+  if (!shouldWarmEditorialContext(record, record.status)) return state;
+
+  try {
+    const warmed = await warmEditorialContext({
+      eventId,
+      fetchMatchData: bsd.fetchMatchData,
+      contextEvents,
+    });
+
+    state.matches[eventId] = {
+      ...state.matches[eventId],
+      editorialWarmedAt: warmed.warmedAt,
+      editorialWarmupMs: warmed.elapsedMs,
+      editorialContext: warmed.context,
+      editorialCandidateCount: warmed.context?.facts?.length || 0,
+    };
+
+    console.log(
+      `Warmed editorial context for BSD event ${eventId} in ${warmed.elapsedMs}ms ` +
+        `(${state.matches[eventId].editorialCandidateCount} candidates).`,
+    );
+    await saveMonitorState(state);
+  } catch (error) {
+    state.matches[eventId] = {
+      ...state.matches[eventId],
+      editorialWarmupFailedAt: new Date().toISOString(),
+      editorialWarmupError: error.message,
+    };
+    console.error(`Editorial warmup failed for BSD event ${eventId}: ${error.message}`);
+  }
+
   return state;
 }
 
@@ -355,6 +403,8 @@ async function tickMonitor() {
     }
 
     state.matches[eventId] = nextRecord;
+
+    state = await maybeWarmEditorialContext(eventId, state, monitorEvents);
 
     if (!isFinishedStatus(nextRecord.status)) continue;
 

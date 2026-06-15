@@ -256,7 +256,7 @@ async function main() {
   console.log(`Wrote ${outFile}`);
 }
 
-async function fetchMatchData(eventId) {
+async function fetchMatchData(eventId, options = {}) {
   const token = process.env.BSD_API_TOKEN;
 
   if (!token) {
@@ -264,12 +264,13 @@ async function fetchMatchData(eventId) {
   }
 
   const event = await requestJson(`/events/${eventId}/`, token);
+  const skipEditorialExtras = Boolean(options.skipEditorialExtras);
   const [incidents, venue, stats, metadata, h2h] = await Promise.all([
     requestJson(`/events/${eventId}/incidents/`, token),
     event.venue_id ? requestJson(`/venues/${event.venue_id}/`, token) : Promise.resolve({}),
     requestOptionalJson(`/events/${eventId}/stats/`, token),
-    requestOptionalJson(`/events/${eventId}/metadata/`, token),
-    requestOptionalJson(`/events/${eventId}/h2h/`, token),
+    skipEditorialExtras ? Promise.resolve(null) : requestOptionalJson(`/events/${eventId}/metadata/`, token),
+    skipEditorialExtras ? Promise.resolve(null) : requestOptionalJson(`/events/${eventId}/h2h/`, token),
   ]);
 
   return toMatchData(event, incidents, venue, { stats, metadata, h2h });

@@ -21,6 +21,19 @@ function getTeamFacts(name) {
 
 function getInternalContext(matchData) {
   const facts = buildFactCandidates(matchData);
+  const warmed = matchData.context?.warmedEditorial?.context;
+
+  if (warmed?.facts?.length) {
+    facts.push(
+      ...warmed.facts.map((fact) => ({
+        ...fact,
+        priority: Math.max(0, Number(fact.priority || 0) - 8),
+        source: `${fact.source || "warmed-editorial"}:warmed`,
+      })),
+    );
+    facts.sort((a, b) => b.priority - a.priority);
+  }
+
   const headline = pickHeadline(facts, matchData);
 
   return {
@@ -85,6 +98,22 @@ function buildFactCandidates(matchData) {
         priority: 89,
         source: "curated-world-cup-team-facts",
         text: `${winnerName} rompe una barrera mundialista: marca por primera vez en el torneo y lo convierte en triunfo.`,
+      });
+    }
+
+    if (Number(winnerFacts.worldCupTitlesBefore2026 || 0) > 0 && margin >= 2) {
+      candidates.push({
+        priority: 80,
+        source: "curated-world-cup-team-facts",
+        text: `${winnerName} impone jerarquía de campeón mundial y convierte el resultado en una declaración de autoridad.`,
+      });
+    }
+
+    if (isDeepRunTeam(winnerFacts) && margin >= 2) {
+      candidates.push({
+        priority: 76,
+        source: "curated-world-cup-team-facts",
+        text: `${winnerName} recuerda por qué carga historia grande en Mundiales: triunfo sólido y mensaje competitivo.`,
       });
     }
 
@@ -208,7 +237,7 @@ function pickHeadline(candidates, matchData) {
 }
 
 function isHistoricFirstWin(facts, prior) {
-  return facts.firstWorldCupAppearance === 2026 && Number(facts.worldCupWinsBefore2026 || 0) === 0 && Number(prior.wins || 0) === 0;
+  return facts.worldCupWinsBefore2026 === 0 && Number(prior.wins || 0) === 0;
 }
 
 function isHistoricFirstGoal(facts, prior) {
@@ -223,6 +252,10 @@ function pushFirstGoalCandidate(candidates, teamName, score, facts, prior) {
     source: "curated-world-cup-team-facts",
     text: `${teamName} ya tiene su primer gol en la historia mundialista, una postal que queda por encima del marcador.`,
   });
+}
+
+function isDeepRunTeam(facts) {
+  return ["champion", "runner_up", "third_place", "semifinal"].includes(facts.bestFinish);
 }
 
 function getScoringStory(matchData) {
