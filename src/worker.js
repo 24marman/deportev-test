@@ -60,6 +60,12 @@ async function renderEvent(eventId, options = {}) {
 
   const outputName = getOutputName(matchData);
   const outputPath = path.join(generatedDir, outputName);
+  console.log(
+    `Render assets for BSD event ${eventId}: venue="${matchData.match?.venue?.name || "unknown"}", ` +
+      `background="${matchData.match?.venue?.image || "unknown"}", ` +
+      `homeFlag="${matchData.teams?.home?.flag || "unknown"}", ` +
+      `awayFlag="${matchData.teams?.away?.flag || "unknown"}"`,
+  );
 
   const renderStartedAt = nowMs();
   console.log(`Rendering ${outputPath}`);

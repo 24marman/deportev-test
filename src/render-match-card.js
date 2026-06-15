@@ -46,7 +46,7 @@ async function waitForRenderer(page) {
 }
 
 async function waitForStableCard(page) {
-  await page.evaluate(async () => {
+  const brokenImages = await page.evaluate(async () => {
     if (document.fonts && document.fonts.ready) {
       await document.fonts.ready;
     }
@@ -60,7 +60,15 @@ async function waitForStableCard(page) {
         });
       }),
     );
+
+    return Array.from(document.images)
+      .filter((image) => image.naturalWidth === 0 || image.naturalHeight === 0)
+      .map((image) => image.currentSrc || image.src || image.getAttribute("src") || "(missing src)");
   });
+
+  if (brokenImages.length > 0) {
+    throw new Error(`Render blocked because images failed to load: ${brokenImages.join(", ")}`);
+  }
 
   if (STABLE_DELAY_MS > 0) {
     await page.waitForTimeout(STABLE_DELAY_MS);
