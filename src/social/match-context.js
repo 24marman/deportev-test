@@ -72,11 +72,17 @@ function buildFactCandidates(matchData) {
   const loserName = normalizeTeamName(loser.name);
   const winnerFacts = homeScore > awayScore ? homeFacts : awayFacts;
   const winnerPrior = homeScore > awayScore ? homePrior : awayPrior;
+  const homeProfile = buildEditorialProfile(homeName, homeFacts, homePrior);
+  const awayProfile = buildEditorialProfile(awayName, awayFacts, awayPrior);
+  const winnerProfile = homeScore > awayScore ? homeProfile : awayProfile;
+  const loserProfile = homeScore > awayScore ? awayProfile : homeProfile;
 
   pushFirstGoalCandidate(candidates, homeName, homeScore, homeFacts, homePrior);
   pushFirstGoalCandidate(candidates, awayName, awayScore, awayFacts, awayPrior);
 
   if (!isDraw) {
+    pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore);
+
     if (Number(winnerPrior.played || 0) > 0 && Number(winnerPrior.wins || 0) === 0) {
       candidates.push({
         priority: 95,
@@ -161,6 +167,8 @@ function buildFactCandidates(matchData) {
       });
     }
   } else {
+    pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore);
+
     if (totalGoals >= 4) {
       candidates.push({
         priority: 82,
@@ -231,7 +239,8 @@ function buildFactCandidates(matchData) {
 
 function pickHeadline(candidates, matchData) {
   const topPriority = candidates[0]?.priority || 0;
-  const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - 5);
+  const spread = topPriority >= 95 ? 2 : 5;
+  const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
   return (topBand[Math.abs(seed) % topBand.length] || candidates[0] || {}).text || "";
 }
@@ -242,6 +251,128 @@ function isHistoricFirstWin(facts, prior) {
 
 function isHistoricFirstGoal(facts, prior) {
   return facts.firstWorldCupAppearance === 2026 && Number(facts.worldCupGoalsBefore2026 || 0) === 0 && Number(prior.goalsFor || 0) === 0;
+}
+
+function buildEditorialProfile(name, facts, prior) {
+  const normalizedFacts = facts || {};
+  const bestFinish = normalizedFacts.bestFinish || "unknown";
+  const titles = Number(normalizedFacts.worldCupTitlesBefore2026 || 0);
+  const debutant = normalizedFacts.firstWorldCupAppearance === 2026 || bestFinish === "debut";
+  const powerScore = getEditorialPowerScore(normalizedFacts);
+
+  return {
+    name,
+    facts: normalizedFacts,
+    prior: prior || {},
+    bestFinish,
+    titles,
+    debutant,
+    powerScore,
+    titleCandidate: powerScore >= 82,
+    historicPower: titles > 0 || ["champion", "runner_up", "third_place", "semifinal"].includes(bestFinish),
+  };
+}
+
+function getEditorialPowerScore(facts) {
+  if (!facts || !Object.keys(facts).length) return 35;
+  if (facts.firstWorldCupAppearance === 2026 || facts.bestFinish === "debut") return 8;
+
+  const baseByFinish = {
+    champion: 90,
+    runner_up: 80,
+    third_place: 74,
+    semifinal: 70,
+    quarterfinal: 58,
+    round_of_16: 46,
+    group_stage: 30,
+  };
+  const base = baseByFinish[facts.bestFinish] ?? 35;
+  const titleBonus = Math.min(15, Number(facts.worldCupTitlesBefore2026 || 0) * 4);
+  return base + titleBonus;
+}
+
+function getFavoriteUnderdog(left, right) {
+  const delta = left.powerScore - right.powerScore;
+  if (Math.abs(delta) < 24) return null;
+
+  return delta > 0
+    ? { favorite: left, underdog: right, delta }
+    : { favorite: right, underdog: left, delta: Math.abs(delta) };
+}
+
+function getFavoriteDescription(profile) {
+  if (profile.titleCandidate) return "una candidata de peso";
+  if (profile.titles > 0) return "una campeona mundial";
+  if (profile.historicPower) return "una selección de historia grande";
+  return "una selección de mayor jerarquía";
+}
+
+function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore) {
+  const matchup = getFavoriteUnderdog(homeProfile, awayProfile);
+  if (!matchup) return;
+
+  const { favorite, underdog, delta } = matchup;
+  const scoreless = Number(homeScore || 0) + Number(awayScore || 0) === 0;
+  const underdogFirstPoint = Number(underdog.prior.points || 0) === 0;
+  const favoriteDescription = getFavoriteDescription(favorite);
+
+  if (underdog.debutant && delta >= 60) {
+    candidates.push({
+      priority: 98,
+      source: "editorial-hierarchy",
+      text: scoreless
+        ? `${underdog.name} firma un punto histórico en su debut mundialista: resiste a ${favorite.name}, ${favoriteDescription}, y deja dudas fuertes en la favorita.`
+        : `${underdog.name} convierte su debut mundialista en un golpe de impacto: le saca un empate a ${favorite.name}, ${favoriteDescription}, y suma un punto histórico.`,
+    });
+    return;
+  }
+
+  if (underdog.debutant) {
+    candidates.push({
+      priority: 94,
+      source: "editorial-hierarchy",
+      text: `${underdog.name} suma un resultado enorme para su historia mundialista; ${favorite.name} se queda corto ante una debutante que jugó sin complejos.`,
+    });
+    return;
+  }
+
+  if (delta >= 45) {
+    candidates.push({
+      priority: 90,
+      source: "editorial-hierarchy",
+      text: `${underdog.name} cambia la lectura del grupo con un empate de mucho peso ante ${favorite.name}, un resultado que sabe a aviso para la favorita.`,
+    });
+  }
+
+  if (underdogFirstPoint) {
+    candidates.push({
+      priority: 88,
+      source: "editorial-hierarchy",
+      text: `${underdog.name} suma su primer punto del torneo y transforma un partido cuesta arriba en una señal de carácter.`,
+    });
+  }
+}
+
+function pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore) {
+  const matchup = getFavoriteUnderdog(winnerProfile, loserProfile);
+  if (!matchup || matchup.favorite !== loserProfile) return;
+
+  const favoriteDescription = getFavoriteDescription(loserProfile);
+
+  if (winnerProfile.debutant && matchup.delta >= 55) {
+    candidates.push({
+      priority: 99,
+      source: "editorial-hierarchy",
+      text: `${winnerProfile.name} escribe una página histórica: vence ${winnerScore}-${loserScore} a ${loserProfile.name}, ${favoriteDescription}, en una de las primeras grandes sorpresas del torneo.`,
+    });
+    return;
+  }
+
+  candidates.push({
+    priority: 93,
+    source: "editorial-hierarchy",
+    text: `${winnerProfile.name} sacude el grupo con un triunfo de alta carga simbólica ante ${loserProfile.name}, una victoria que cambia expectativas y conversación.`,
+  });
 }
 
 function pushFirstGoalCandidate(candidates, teamName, score, facts, prior) {

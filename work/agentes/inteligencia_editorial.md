@@ -41,9 +41,34 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 
 - Evitar frases genericas o repetidas.
 - Priorizar hitos relevantes: primera victoria mundialista, primer gol mundialista, remontadas, goleadas, invictos, primera victoria del torneo, porteria en cero y stats dominantes.
+- Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
+- Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, batacazo de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
 - No inventar records ni clasificaciones si la data no los sostiene.
+
+## Criterio editorial de jerarquia
+
+El marcador nunca se interpreta solo. Antes de escribir, el agente debe cruzar:
+
+- Palmares mundialista y mejor resultado historico.
+- Si la seleccion debuta en 2026.
+- Si ya tenia goles, victorias o puntos mundialistas previos.
+- Estado del grupo antes del partido.
+- Marcador final, margen, remontada y volumen de goles.
+
+Ejemplo de lectura correcta: un empate de Cabo Verde ante España no es solo "partido cerrado"; es un punto historico para una debutante ante una candidata de peso, y al mismo tiempo un resultado que deja dudas para España.
+
+## RAG y fuentes externas
+
+Un RAG puede ser util para la version avanzada, pero no debe bloquear el post final. El uso correcto seria:
+
+- Antes del partido: consultar fuentes confiables, rankings, perfiles historicos y notas previas.
+- Guardar ese resumen como contexto curado y versionado por partido/seleccion.
+- Al medio tiempo: refrescar solo senales utiles si ya hay datos del partido.
+- Al final: no buscar desde cero; solo elegir la mejor narrativa con datos ya preparados.
+
+La capa rapida obligatoria vive en codigo y base curada local, porque esa es la que garantiza velocidad y evita inventar.
 
 ## Formato actual de tweet
 
