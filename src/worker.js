@@ -32,55 +32,74 @@ function getOutputName(matchData) {
   return `${date}_${group}_${home}-${score}-${away}.webp`;
 }
 
-async function renderEvent(eventId) {
+function nowMs() {
+  return Date.now();
+}
+
+function logDuration(label, startedAt) {
+  console.log(`${label} completed in ${Date.now() - startedAt}ms.`);
+}
+
+async function renderEvent(eventId, options = {}) {
+  const startedAt = nowMs();
   console.log(`Fetching BSD event ${eventId}`);
   const matchData = await bsd.fetchMatchData(eventId);
-  await enrichCompetitionContext(matchData);
+  logDuration(`Fetch BSD event ${eventId}`, startedAt);
+
+  const contextStartedAt = nowMs();
+  await enrichCompetitionContext(matchData, options.contextEvents);
+  logDuration(`Context enrichment for BSD event ${eventId}`, contextStartedAt);
+
   const outputName = getOutputName(matchData);
   const outputPath = path.join(generatedDir, outputName);
 
+  const renderStartedAt = nowMs();
   console.log(`Rendering ${outputPath}`);
   await renderMatchCard({
     data: matchData,
     outputPath,
-    quality: Number(process.env.RENDER_QUALITY || "88"),
+    quality: Number(process.env.RENDER_QUALITY || "82"),
   });
+  logDuration(`Render for BSD event ${eventId}`, renderStartedAt);
 
-  let uploadResult;
-  try {
-    uploadResult = await uploadGeneratedImage(outputPath, outputName);
-  } catch (error) {
-    uploadResult = {
-      uploaded: false,
-      reason: error.message,
-    };
-  }
+  const publishStartedAt = nowMs();
+  const [uploadSettled, socialSettled] = await Promise.allSettled([
+    uploadGeneratedImage(outputPath, outputName),
+    publishFinalScorePost({
+      matchData,
+      imagePath: outputPath,
+    }),
+  ]);
+
+  const uploadResult =
+    uploadSettled.status === "fulfilled"
+      ? uploadSettled.value
+      : {
+          uploaded: false,
+          reason: uploadSettled.reason.message,
+        };
+
+  const socialResult =
+    socialSettled.status === "fulfilled"
+      ? socialSettled.value
+      : {
+          published: false,
+          mode: process.env.X_POST_MODE || "manual",
+          reason: socialSettled.reason.message,
+        };
 
   console.log(
     uploadResult.uploaded
       ? `Uploaded ${uploadResult.publicUrl}`
       : `Skipped upload: ${uploadResult.reason}`,
   );
-
-  let socialResult;
-  try {
-    socialResult = await publishFinalScorePost({
-      matchData,
-      imagePath: outputPath,
-    });
-  } catch (error) {
-    socialResult = {
-      published: false,
-      mode: process.env.X_POST_MODE || "manual",
-      reason: error.message,
-    };
-  }
-
   console.log(
     socialResult.published
       ? `Published ${socialResult.tweetUrl}`
       : `X post not published: ${socialResult.reason}`,
   );
+  logDuration(`Upload/post for BSD event ${eventId}`, publishStartedAt);
+  logDuration(`Full processing for BSD event ${eventId}`, startedAt);
 
   return {
     matchData,
@@ -90,12 +109,14 @@ async function renderEvent(eventId) {
   };
 }
 
-async function enrichCompetitionContext(matchData) {
+async function enrichCompetitionContext(matchData, contextEvents) {
   try {
-    const events = await bsd.fetchEvents({
-      date_to: matchData.source?.eventDate || new Date().toISOString().slice(0, 10),
-      limit: 100,
-    });
+    const events =
+      contextEvents ||
+      (await bsd.fetchEvents({
+        date_to: matchData.source?.eventDate || new Date().toISOString().slice(0, 10),
+        limit: 100,
+      }));
 
     matchData.context = {
       ...(matchData.context || {}),
@@ -227,7 +248,7 @@ async function fetchMonitorEvents() {
   return events;
 }
 
-async function processFinishedEvent(event, state) {
+async function processFinishedEvent(event, state, contextEvents) {
   const eventId = String(event.id);
   const record = state.matches[eventId] || {};
 
@@ -244,7 +265,7 @@ async function processFinishedEvent(event, state) {
   };
   await saveMonitorState(state);
 
-  const result = await renderEvent(eventId);
+  const result = await renderEvent(eventId, { contextEvents });
 
   state.matches[eventId] = {
     ...state.matches[eventId],
@@ -357,7 +378,7 @@ async function tickMonitor() {
       continue;
     }
 
-    state = await processFinishedEvent(event, state);
+    state = await processFinishedEvent(event, state, monitorEvents);
   }
 
   await saveMonitorState(state);

@@ -6,6 +6,8 @@ const https = require("https");
 const { getDisplayTeamName, getFlagAssetUrl } = require("../../src/lib/team-metadata");
 
 const API_BASE = "https://sports.bzzoiro.com/api/v2";
+const REQUEST_TIMEOUT_MS = Number(process.env.BSD_REQUEST_TIMEOUT_MS || "8000");
+const OPTIONAL_REQUEST_TIMEOUT_MS = Number(process.env.BSD_OPTIONAL_REQUEST_TIMEOUT_MS || "1800");
 const WORLD_CUP = {
   leagueId: 27,
   seasonId: 188,
@@ -30,7 +32,7 @@ const FIFA_VENUE_NAMES = {
   1187: "Kansas City Stadium",
 };
 
-function requestJson(endpoint, token) {
+function requestJson(endpoint, token, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${endpoint}`;
   return new Promise((resolve, reject) => {
     const req = https.get(
@@ -62,9 +64,20 @@ function requestJson(endpoint, token) {
       },
     );
 
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`BSD API timeout after ${timeoutMs}ms: ${endpoint}`));
+    });
     req.on("error", reject);
     req.end();
   });
+}
+
+async function requestOptionalJson(endpoint, token, fallback = null) {
+  try {
+    return await requestJson(endpoint, token, OPTIONAL_REQUEST_TIMEOUT_MS);
+  } catch (error) {
+    return fallback;
+  }
 }
 
 function getGroupLetter(groupName) {
@@ -164,7 +177,7 @@ function splitScorers(incidents) {
   return { homeScorers, awayScorers };
 }
 
-function toMatchData(event, incidents, venue) {
+function toMatchData(event, incidents, venue, extras = {}) {
   const scorers = splitScorers(incidents.incidents || []);
 
   return {
@@ -210,6 +223,12 @@ function toMatchData(event, incidents, venue) {
       },
     },
     events: scorers,
+    context: {
+      ...(extras.context || {}),
+      matchStats: extras.stats || null,
+      metadata: extras.metadata || null,
+      h2h: extras.h2h || null,
+    },
   };
 }
 
@@ -223,9 +242,14 @@ async function main() {
   }
 
   const event = await requestJson(`/events/${eventId}/`, token);
-  const incidents = await requestJson(`/events/${eventId}/incidents/`, token);
-  const venue = event.venue_id ? await requestJson(`/venues/${event.venue_id}/`, token) : {};
-  const matchData = toMatchData(event, incidents, venue);
+  const [incidents, venue, stats, metadata, h2h] = await Promise.all([
+    requestJson(`/events/${eventId}/incidents/`, token),
+    event.venue_id ? requestJson(`/venues/${event.venue_id}/`, token) : Promise.resolve({}),
+    requestOptionalJson(`/events/${eventId}/stats/`, token),
+    requestOptionalJson(`/events/${eventId}/metadata/`, token),
+    requestOptionalJson(`/events/${eventId}/h2h/`, token),
+  ]);
+  const matchData = toMatchData(event, incidents, venue, { stats, metadata, h2h });
 
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, `${JSON.stringify(matchData, null, 2)}\n`);
@@ -240,10 +264,15 @@ async function fetchMatchData(eventId) {
   }
 
   const event = await requestJson(`/events/${eventId}/`, token);
-  const incidents = await requestJson(`/events/${eventId}/incidents/`, token);
-  const venue = event.venue_id ? await requestJson(`/venues/${event.venue_id}/`, token) : {};
+  const [incidents, venue, stats, metadata, h2h] = await Promise.all([
+    requestJson(`/events/${eventId}/incidents/`, token),
+    event.venue_id ? requestJson(`/venues/${event.venue_id}/`, token) : Promise.resolve({}),
+    requestOptionalJson(`/events/${eventId}/stats/`, token),
+    requestOptionalJson(`/events/${eventId}/metadata/`, token),
+    requestOptionalJson(`/events/${eventId}/h2h/`, token),
+  ]);
 
-  return toMatchData(event, incidents, venue);
+  return toMatchData(event, incidents, venue, { stats, metadata, h2h });
 }
 
 async function fetchEvent(eventId) {

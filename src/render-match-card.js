@@ -9,6 +9,9 @@ const sharp = require("sharp");
 const DEFAULT_TEMPLATE_DIR = path.join("work", "templates", "figma_match_card");
 const DEFAULT_OUTPUT = path.join("outputs", "generated", "match-card.webp");
 const CARD_SIZE = { width: 1080, height: 1350 };
+const STABLE_DELAY_MS = Number(process.env.RENDER_STABLE_DELAY_MS || "75");
+const WEBP_EFFORT = Number(process.env.RENDER_WEBP_EFFORT || "2");
+let browserPromise = null;
 
 function getArg(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
@@ -24,8 +27,25 @@ function ensureDirectory(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-async function waitForStableCard(page) {
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = chromium.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+  }
+
+  const browser = await browserPromise;
+  if (browser.isConnected()) return browser;
+
+  browserPromise = null;
+  return getBrowser();
+}
+
+async function waitForRenderer(page) {
   await page.waitForFunction(() => Boolean(window.renderMatchCard), null, { timeout: 10000 });
+}
+
+async function waitForStableCard(page) {
   await page.evaluate(async () => {
     if (document.fonts && document.fonts.ready) {
       await document.fonts.ready;
@@ -41,7 +61,10 @@ async function waitForStableCard(page) {
       }),
     );
   });
-  await page.waitForTimeout(250);
+
+  if (STABLE_DELAY_MS > 0) {
+    await page.waitForTimeout(STABLE_DELAY_MS);
+  }
 }
 
 async function renderMatchCard({ data, templateDir = DEFAULT_TEMPLATE_DIR, outputPath = DEFAULT_OUTPUT, quality = 88 }) {
@@ -51,25 +74,23 @@ async function renderMatchCard({ data, templateDir = DEFAULT_TEMPLATE_DIR, outpu
 
   ensureDirectory(absoluteOutputPath);
 
-  const browser = await chromium.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  const browser = await getBrowser();
+  const page = await browser.newPage({
+    viewport: CARD_SIZE,
+    deviceScaleFactor: 1,
   });
 
   try {
-    const page = await browser.newPage({
-      viewport: CARD_SIZE,
-      deviceScaleFactor: 1,
-    });
-
-    await page.goto(indexUrl, { waitUntil: "load" });
-    await waitForStableCard(page);
+    await page.goto(indexUrl, { waitUntil: "domcontentloaded" });
+    await waitForRenderer(page);
 
     if (data) {
       await page.evaluate((matchData) => {
         window.renderMatchCard(matchData);
       }, data);
-      await waitForStableCard(page);
     }
+
+    await waitForStableCard(page);
 
     const card = page.locator("#match-card");
     const pngBuffer = await card.screenshot({
@@ -81,12 +102,23 @@ async function renderMatchCard({ data, templateDir = DEFAULT_TEMPLATE_DIR, outpu
       .rotate()
       .webp({
         quality,
-        effort: 5,
+        effort: WEBP_EFFORT,
       })
       .toFile(absoluteOutputPath);
 
     return absoluteOutputPath;
   } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function closeRenderBrowser() {
+  if (!browserPromise) return;
+
+  const browser = await browserPromise.catch(() => null);
+  browserPromise = null;
+
+  if (browser?.isConnected()) {
     await browser.close();
   }
 }
@@ -97,9 +129,12 @@ async function main() {
   const templateDir = getArg("template", DEFAULT_TEMPLATE_DIR);
   const quality = Number(getArg("quality", process.env.RENDER_QUALITY || "88"));
   const data = fs.existsSync(dataPath) ? readJson(dataPath) : null;
-  const renderedPath = await renderMatchCard({ data, templateDir, outputPath, quality });
-
-  console.log(`Rendered ${renderedPath}`);
+  try {
+    const renderedPath = await renderMatchCard({ data, templateDir, outputPath, quality });
+    console.log(`Rendered ${renderedPath}`);
+  } finally {
+    await closeRenderBrowser();
+  }
 }
 
 if (require.main === module) {
@@ -110,5 +145,6 @@ if (require.main === module) {
 }
 
 module.exports = {
+  closeRenderBrowser,
   renderMatchCard,
 };
