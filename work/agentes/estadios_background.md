@@ -11,7 +11,7 @@ Este agente se encarga de que cada partido tenga un estadio visual correcto, con
 - Crear y mantener la libreria de estadios.
 - Mapear nombres o IDs de sedes a imagenes de estadio.
 - Mapear nombres comerciales de estadios a nombres oficiales FIFA usados durante el Mundial 2026.
-- Preparar imagenes para que funcionen en el template: recorte, encuadre, contraste, desaturacion, tinte verde y oscuridad.
+- Preparar imagenes finales para que funcionen en el template: 1080x1350, formato `.webp`, recorte y tratamiento visual ya integrados.
 - Definir fallbacks cuando no exista imagen para una sede.
 - Coordinar con assets/licencias para validar origen y permisos de imagenes.
 - Coordinar con conversion Figma/template para respetar el slot `venue.image`.
@@ -23,16 +23,57 @@ Este agente se encarga de que cada partido tenga un estadio visual correcto, con
 - No decide resultados ni datos deportivos.
 - No publica en redes.
 - No usa fotos sin licencia clara.
-- No modifica las luces superiores si el diseno las define como capa fija.
+- No vuelve a aplicar luces superiores, glow inferior, texturas ni tinte si el fondo final ya los incluye.
 
 ## Reglas De Template
 
 - La imagen del estadio es dinamica.
 - El nombre visible del estadio debe ser el nombre oficial FIFA del Mundial 2026, no necesariamente el nombre comercial que entregue la API.
-- Las luces superiores son fijas y pertenecen al template.
-- Texturas, overlays, glows y tratamiento visual pueden ser fijos del template.
-- El estadio debe colocarse debajo de las luces y overlays.
-- El estadio debe tener suficiente oscuridad para no competir con marcador, nombres o banderas.
+- Los fondos actuales ya incluyen luces superiores y efecto verde inferior.
+- El template debe reemplazar unicamente `venue.image`.
+- El estadio debe quedar como fondo completo del canvas, debajo de toda la informacion dinamica.
+- Logos, marcador, banderas, anotadores, nombre de estadio y publicacion no deben cambiar por este agente.
+
+## Ubicacion Tecnica
+
+Los fondos viven dentro del repo para que Railway los despliegue junto con el renderer y no haya descargas remotas al finalizar un partido:
+
+`work/templates/figma_match_card/assets/backgrounds/`
+
+Archivos esperados:
+
+- `atlanta.webp`
+- `boston.webp`
+- `dallas.webp`
+- `generic.webp`
+- `guadalajara.webp`
+- `houston.webp`
+- `kansas.webp`
+- `los-angeles.webp`
+- `mexico-city.webp`
+- `miami.webp`
+- `monterrey.webp`
+- `new-jersey-new-york.webp`
+- `philadelphia.webp`
+- `san-francisco.webp`
+- `seattle.webp`
+- `toronto.webp`
+- `vancouver.webp`
+
+## Flujo De Resolucion
+
+1. El adaptador BSD lee el `venue_id` del partido.
+2. `VENUE_BACKGROUND_SLUGS` convierte ese ID al archivo `.webp`.
+3. Si el ID no existe, el sistema intenta inferir por nombre de sede/ciudad.
+4. Si no hay coincidencia confiable, usa `generic.webp`.
+5. El renderer carga esa ruta en `match.venue.image` y conserva todos los elementos encima sin cambios.
+
+## Mantenimiento Futuro
+
+- Para reemplazar un fondo existente: sustituir el archivo `.webp` con el mismo nombre y redesplegar.
+- Para agregar una nueva sede: agregar el `.webp` a `assets/backgrounds/` y sumar su mapeo en `VENUE_BACKGROUND_SLUGS`.
+- Para cambiar el fallback: reemplazar `generic.webp`.
+- Si en el futuro se requiere actualizar fondos sin deploy, se puede migrar esta libreria a Supabase Storage/CDN, pero la version actual prioriza velocidad y estabilidad.
 
 ## Primeras Tareas
 

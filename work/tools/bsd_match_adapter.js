@@ -32,6 +32,27 @@ const FIFA_VENUE_NAMES = {
   1187: "Kansas City Stadium",
 };
 
+const VENUE_BACKGROUND_SLUGS = {
+  265: "atlanta",
+  266: "vancouver",
+  273: "boston",
+  275: "toronto",
+  290: "seattle",
+  295: "mexico-city",
+  304: "monterrey",
+  307: "guadalajara",
+  1180: "los-angeles",
+  1181: "san-francisco",
+  1182: "new-jersey-new-york",
+  1183: "houston",
+  1184: "dallas",
+  1185: "philadelphia",
+  1186: "miami",
+  1187: "kansas",
+};
+
+const VENUE_BACKGROUND_FALLBACK = "generic";
+
 function requestJson(endpoint, token, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${API_BASE}${endpoint}`;
   return new Promise((resolve, reject) => {
@@ -132,6 +153,53 @@ function getVenueName(venue) {
   return FIFA_VENUE_NAMES[venue.id] || venue.name || "";
 }
 
+function normalizeVenueText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function inferVenueBackgroundSlug(venue = {}) {
+  const text = normalizeVenueText(
+    [venue.name, venue.city, venue.country, getVenueName(venue)].filter(Boolean).join(" "),
+  );
+
+  if (!text) return VENUE_BACKGROUND_FALLBACK;
+
+  const rules = [
+    ["new-jersey-new-york", ["new york", "new jersey", "metlife", "east rutherford"]],
+    ["san-francisco", ["san francisco", "bay area", "santa clara", "levi"]],
+    ["los-angeles", ["los angeles", "inglewood", "sofi"]],
+    ["kansas", ["kansas", "arrowhead"]],
+    ["mexico-city", ["mexico city", "ciudad de mexico", "azteca"]],
+    ["guadalajara", ["guadalajara", "akron"]],
+    ["monterrey", ["monterrey", "bbva"]],
+    ["atlanta", ["atlanta", "mercedes benz"]],
+    ["boston", ["boston", "foxborough", "gillette"]],
+    ["dallas", ["dallas", "arlington", "at t", "att stadium"]],
+    ["houston", ["houston", "nrg"]],
+    ["miami", ["miami", "hard rock"]],
+    ["philadelphia", ["philadelphia", "lincoln financial"]],
+    ["seattle", ["seattle", "lumen"]],
+    ["toronto", ["toronto", "bmo"]],
+    ["vancouver", ["vancouver", "bc place"]],
+  ];
+
+  for (const [slug, needles] of rules) {
+    if (needles.some((needle) => text.includes(needle))) return slug;
+  }
+
+  return VENUE_BACKGROUND_FALLBACK;
+}
+
+function getVenueBackground(venue = {}) {
+  const slug = VENUE_BACKGROUND_SLUGS[venue.id] || inferVenueBackgroundSlug(venue);
+  return `./assets/backgrounds/${slug || VENUE_BACKGROUND_FALLBACK}.webp`;
+}
+
 function toScorer(incident) {
   return {
     minute: getMinute(incident),
@@ -203,7 +271,7 @@ function toMatchData(event, incidents, venue, extras = {}) {
         providerName: venue.name || "",
         city: venue.city || "",
         country: venue.country || "",
-        image: "./assets/stadium.png",
+        image: getVenueBackground(venue),
       },
     },
     teams: {
@@ -348,4 +416,5 @@ module.exports = {
   fetchMatchData,
   toMatchData,
   getVenueName,
+  getVenueBackground,
 };

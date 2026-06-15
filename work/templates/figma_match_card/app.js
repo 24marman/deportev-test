@@ -10,7 +10,7 @@ const matchData = {
     status: "FINAL",
     venue: {
       name: "SAN FRANCISCO BAY AREA STADIUM",
-      image: "./assets/stadium.png",
+      image: "./assets/backgrounds/san-francisco.webp",
     },
   },
   teams: {
