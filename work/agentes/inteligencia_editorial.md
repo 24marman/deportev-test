@@ -44,10 +44,12 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
 - Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, batacazo de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
 - Detectar partidazos por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
+- Detectar goles decisivos en los ultimos minutos: empate rescatado, triunfo agonico, remontada o gol que cambia por completo el cierre emocional del partido.
 - Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos al rojo vivo y cierres sujetos a combinaciones.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
 - No inventar records ni clasificaciones si la data no los sostiene.
+- Escribir corto: una linea como objetivo, dos maximo si el contexto lo justifica. Evitar frases largas con demasiadas ideas.
 
 ## Criterio editorial de jerarquia
 
@@ -78,9 +80,20 @@ El "guru" no es una sola frase generativa; es un sistema de capas:
 
 1. Perfil historico de selecciones: palmares, debut, mejor actuacion, goles/victorias previas.
 2. Lectura de partido: marcador, margen, remontada, goleadores, ritmo, stats y volumen ofensivo.
-3. Lectura de grupo: puntos antes/despues, jornada, presion para clasificar y necesidad de resultados.
-4. Contexto precalentado: h2h, previas, lesionados, rachas y notas relevantes guardadas antes del final.
-5. Selector editorial: elige el angulo mas fuerte y evita que una frase generica tape una historia mejor.
+3. Lectura emocional del cierre: goles al 85'+, 90'+ o agregado que rescatan empates, deciden victorias o cambian el tono de la historia.
+4. Lectura de grupo: puntos antes/despues, jornada, presion para clasificar y necesidad de resultados.
+5. Contexto precalentado: h2h, previas, lesionados, rachas y notas relevantes guardadas antes del final.
+6. Selector editorial: elige el angulo mas fuerte y evita que una frase generica tape una historia mejor.
+
+## Estilo De Redaccion
+
+- Priorizar impacto sobre explicacion.
+- No escribir parrafos.
+- Usar frases compactas como:
+  - `Con gol al 90+3', Canada rescata un empate que mantiene vivo el Grupo B.`
+  - `Brasil gana un partidazo de cinco goles y manda un aviso fuerte en su grupo.`
+  - `Haiti suma una victoria historica y llega con vida plena a la ultima jornada.`
+- Si una estadistica confirma la historia, integrarla en pocas palabras: `con 12 remates a puerta`, `tras 30 remates`, `con dominio total`.
 
 ## Formato actual de tweet
 

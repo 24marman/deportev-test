@@ -64,6 +64,7 @@ function buildFactCandidates(matchData) {
   const stats = extractStatHighlights(matchData.context?.matchStats, homeName, awayName);
   const statSummary = summarizeStats(matchData.context?.matchStats);
   const scoring = getScoringStory(matchData);
+  const decisiveLateGoal = getDecisiveLateGoalStory(matchData);
   const candidates = [];
 
   const isDraw = homeScore === awayScore;
@@ -94,6 +95,14 @@ function buildFactCandidates(matchData) {
     winnerName,
     group,
     statSummary,
+  });
+  pushDecisiveLateGoalCandidate(candidates, {
+    story: decisiveLateGoal,
+    homeName,
+    awayName,
+    homeScore,
+    awayScore,
+    group,
   });
 
   if (!isDraw) {
@@ -264,12 +273,16 @@ function buildFactCandidates(matchData) {
 
   return candidates
     .filter((candidate) => candidate.text)
+    .map((candidate) => ({
+      ...candidate,
+      text: compactEditorialText(candidate.text),
+    }))
     .sort((a, b) => b.priority - a.priority);
 }
 
 function pickHeadline(candidates, matchData) {
   const topPriority = candidates[0]?.priority || 0;
-  const spread = topPriority >= 95 ? 2 : 5;
+  const spread = topPriority >= 90 ? 2 : 5;
   const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
   return (topBand[Math.abs(seed) % topBand.length] || candidates[0] || {}).text || "";
@@ -319,17 +332,17 @@ function pushHighScoringMatchCandidate(candidates, context) {
 
   if (isDraw) {
     candidates.push({
-      priority: totalGoals >= 6 ? 92 : 88,
+      priority: totalGoals >= 6 ? 93 : 91,
       source: "editorial-match-tempo",
-      text: `${homeName} y ${awayName} firman un partidazo${groupPhrase}: intercambio de golpes, goles y una tensión que deja el grupo encendido${statsPhrase}.`,
+      text: `${homeName} y ${awayName} firman un partidazo${groupPhrase}: goles, respuesta y tensión hasta el final${statsPhrase}.`,
     });
     return;
   }
 
   candidates.push({
-    priority: totalGoals >= 6 ? 92 : 88,
+    priority: totalGoals >= 6 ? 93 : 91,
     source: "editorial-match-tempo",
-    text: `${winnerName} sale de pie de un partidazo${groupPhrase}: triunfo de alto voltaje, marcador abierto y tres puntos que pesan más por la forma${statsPhrase}.`,
+    text: `${winnerName} sale de pie de un partidazo${groupPhrase}: triunfo de alto voltaje y tres puntos enormes${statsPhrase}.`,
   });
 }
 
@@ -337,18 +350,43 @@ function getOpenGameStatsPhrase(statSummary) {
   if (!statSummary) return "";
 
   if (statSummary.totalShots >= 28 && statSummary.totalShotsOnTarget >= 9) {
-    return `, respaldado por ${statSummary.totalShots} remates y ${statSummary.totalShotsOnTarget} a puerta`;
+    return `, con ${statSummary.totalShots} remates y ${statSummary.totalShotsOnTarget} a puerta`;
   }
 
   if (statSummary.totalXg >= 3.5) {
-    return `, con ${formatStatNumber(statSummary.totalXg)} xG combinados que reflejan el volumen ofensivo`;
+    return `, con ${formatStatNumber(statSummary.totalXg)} xG combinados`;
   }
 
   if (statSummary.totalShots >= 24) {
-    return `, con ${statSummary.totalShots} remates que confirman el ritmo ofensivo`;
+    return `, con ${statSummary.totalShots} remates`;
   }
 
   return "";
+}
+
+function pushDecisiveLateGoalCandidate(candidates, context) {
+  const { story, homeName, awayName, homeScore, awayScore, group } = context;
+  if (!story) return;
+
+  const teamName = story.side === "home" ? homeName : awayName;
+  const opponentName = story.side === "home" ? awayName : homeName;
+  const groupPhrase = group ? ` en el Grupo ${group}` : "";
+  const minute = story.minuteLabel;
+
+  if (homeScore === awayScore) {
+    candidates.push({
+      priority: 96,
+      source: "bsd-incidents:late-decisive-goal",
+      text: `${teamName} rescata el empate al ${minute}${groupPhrase}; golpe anímico para ${teamName} y frustración para ${opponentName}.`,
+    });
+    return;
+  }
+
+  candidates.push({
+    priority: 96,
+    source: "bsd-incidents:late-decisive-goal",
+    text: `${teamName} decide el partido al ${minute}${groupPhrase}: victoria agónica y tres puntos que valen oro.`,
+  });
 }
 
 function formatStatNumber(value) {
@@ -599,14 +637,93 @@ function getScoringStory(matchData) {
   return {};
 }
 
+function getDecisiveLateGoalStory(matchData) {
+  const events = getSortedGoalEvents(matchData);
+  if (!events.length) return null;
+
+  const finalHome = Number(matchData.teams?.home?.score || 0);
+  const finalAway = Number(matchData.teams?.away?.score || 0);
+  if (finalHome === 0 && finalAway === 0) return null;
+
+  let homeScore = 0;
+  let awayScore = 0;
+  let decisive = null;
+
+  for (const event of events) {
+    const beforeHome = homeScore;
+    const beforeAway = awayScore;
+
+    if (event.side === "home") homeScore += 1;
+    if (event.side === "away") awayScore += 1;
+
+    if (!isLateGoal(event.minuteValue)) continue;
+
+    const afterDraw = homeScore === awayScore;
+    const afterLeader = homeScore > awayScore ? "home" : homeScore < awayScore ? "away" : null;
+    const beforeLeader = beforeHome > beforeAway ? "home" : beforeHome < beforeAway ? "away" : null;
+
+    if (afterDraw && beforeLeader && beforeLeader !== event.side) {
+      decisive = event;
+    } else if (afterLeader === event.side && beforeLeader !== event.side) {
+      decisive = event;
+    }
+  }
+
+  return decisive;
+}
+
+function getSortedGoalEvents(matchData) {
+  return [
+    ...(matchData.events?.homeScorers || []).flatMap((event) => expandScorerEvent(event, "home")),
+    ...(matchData.events?.awayScorers || []).flatMap((event) => expandScorerEvent(event, "away")),
+  ].sort((a, b) => a.minuteValue - b.minuteValue);
+}
+
+function isLateGoal(minuteValue) {
+  return minuteValue >= 85;
+}
+
 function expandScorerEvent(event, side) {
   const minutes = Array.isArray(event.minutes) && event.minutes.length ? event.minutes : [event.minute];
   return minutes
     .filter(Boolean)
     .map((minute) => ({
       side,
-      minuteValue: parseInt(String(minute).replace(/'.*/, ""), 10) || 0,
+      minuteLabel: normalizeMinuteLabel(minute),
+      minuteValue: parseGoalMinuteValue(minute),
     }));
+}
+
+function parseGoalMinuteValue(minute) {
+  const text = String(minute).replace(/[’']/g, "").trim();
+  const added = text.match(/^(\d+)\s*\+\s*(\d+)$/);
+  if (added) return Number(added[1]) + Number(added[2]);
+  return parseInt(text, 10) || 0;
+}
+
+function normalizeMinuteLabel(minute) {
+  const text = String(minute).replace(/[’']/g, "").trim();
+  return `${text}'`;
+}
+
+function compactEditorialText(text) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (cleaned.length <= 150) return cleaned;
+
+  const sentences = cleaned.match(/[^.!?]+[.!?]/g) || [cleaned];
+  const first = sentences[0].trim();
+  if (first.length <= 150) return first;
+
+  const shortened = first
+    .replace(/, una victoria que cambia expectativas y conversación/g, "")
+    .replace(/ y tres puntos que pesan más por la forma/g, "")
+    .replace(/ para sostener sus opciones/g, "")
+    .replace(/ con presión real/g, "")
+    .replace(/ y deja dudas fuertes en la favorita/g, "")
+    .replace(/, un resultado que sabe a aviso para la favorita/g, "");
+
+  if (shortened.length <= 150) return shortened;
+  return `${shortened.slice(0, 147).replace(/\s+\S*$/, "")}...`;
 }
 
 function extractStatHighlights(rawStats, homeName, awayName) {
