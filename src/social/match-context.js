@@ -59,7 +59,10 @@ function buildFactCandidates(matchData) {
   const prior = matchData.context?.priorGroup || {};
   const homePrior = prior.homePrior || {};
   const awayPrior = prior.awayPrior || {};
+  const homeAfter = prior.homeAfter || projectStanding(homePrior, homeScore, awayScore);
+  const awayAfter = prior.awayAfter || projectStanding(awayPrior, awayScore, homeScore);
   const stats = extractStatHighlights(matchData.context?.matchStats, homeName, awayName);
+  const statSummary = summarizeStats(matchData.context?.matchStats);
   const scoring = getScoringStory(matchData);
   const candidates = [];
 
@@ -76,9 +79,22 @@ function buildFactCandidates(matchData) {
   const awayProfile = buildEditorialProfile(awayName, awayFacts, awayPrior);
   const winnerProfile = homeScore > awayScore ? homeProfile : awayProfile;
   const loserProfile = homeScore > awayScore ? awayProfile : homeProfile;
+  const winnerAfter = homeScore > awayScore ? homeAfter : awayAfter;
+  const loserAfter = homeScore > awayScore ? awayAfter : homeAfter;
 
   pushFirstGoalCandidate(candidates, homeName, homeScore, homeFacts, homePrior);
   pushFirstGoalCandidate(candidates, awayName, awayScore, awayFacts, awayPrior);
+  pushHighScoringMatchCandidate(candidates, {
+    homeName,
+    awayName,
+    homeScore,
+    awayScore,
+    totalGoals,
+    isDraw,
+    winnerName,
+    group,
+    statSummary,
+  });
 
   if (!isDraw) {
     pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore);
@@ -194,6 +210,20 @@ function buildFactCandidates(matchData) {
     candidates.push(highlight);
   }
 
+  pushGroupStakesCandidates(candidates, {
+    homeName,
+    awayName,
+    winnerName,
+    loserName,
+    isDraw,
+    matchday,
+    group,
+    homeAfter,
+    awayAfter,
+    winnerAfter,
+    loserAfter,
+  });
+
   if (matchday === 1 && !isDraw) {
     candidates.push({
       priority: 58,
@@ -251,6 +281,163 @@ function isHistoricFirstWin(facts, prior) {
 
 function isHistoricFirstGoal(facts, prior) {
   return facts.firstWorldCupAppearance === 2026 && Number(facts.worldCupGoalsBefore2026 || 0) === 0 && Number(prior.goalsFor || 0) === 0;
+}
+
+function projectStanding(prior, goalsFor, goalsAgainst) {
+  const row = {
+    played: Number(prior.played || 0) + 1,
+    wins: Number(prior.wins || 0),
+    draws: Number(prior.draws || 0),
+    losses: Number(prior.losses || 0),
+    points: Number(prior.points || 0),
+    goalsFor: Number(prior.goalsFor || 0) + Number(goalsFor || 0),
+    goalsAgainst: Number(prior.goalsAgainst || 0) + Number(goalsAgainst || 0),
+  };
+
+  if (goalsFor > goalsAgainst) {
+    row.wins += 1;
+    row.points += 3;
+  } else if (goalsFor === goalsAgainst) {
+    row.draws += 1;
+    row.points += 1;
+  } else {
+    row.losses += 1;
+  }
+
+  return row;
+}
+
+function pushHighScoringMatchCandidate(candidates, context) {
+  const { homeName, awayName, homeScore, awayScore, totalGoals, isDraw, winnerName, group, statSummary } = context;
+  const bothTeamsMultipleGoals = homeScore >= 2 && awayScore >= 2;
+  const dramaticScoreline = totalGoals >= 5 || bothTeamsMultipleGoals;
+
+  if (!dramaticScoreline) return;
+
+  const statsPhrase = getOpenGameStatsPhrase(statSummary);
+  const groupPhrase = group ? ` en el Grupo ${group}` : "";
+
+  if (isDraw) {
+    candidates.push({
+      priority: totalGoals >= 6 ? 92 : 88,
+      source: "editorial-match-tempo",
+      text: `${homeName} y ${awayName} firman un partidazo${groupPhrase}: intercambio de golpes, goles y una tensión que deja el grupo encendido${statsPhrase}.`,
+    });
+    return;
+  }
+
+  candidates.push({
+    priority: totalGoals >= 6 ? 92 : 88,
+    source: "editorial-match-tempo",
+    text: `${winnerName} sale de pie de un partidazo${groupPhrase}: triunfo de alto voltaje, marcador abierto y tres puntos que pesan más por la forma${statsPhrase}.`,
+  });
+}
+
+function getOpenGameStatsPhrase(statSummary) {
+  if (!statSummary) return "";
+
+  if (statSummary.totalShots >= 28 && statSummary.totalShotsOnTarget >= 9) {
+    return `, respaldado por ${statSummary.totalShots} remates y ${statSummary.totalShotsOnTarget} a puerta`;
+  }
+
+  if (statSummary.totalXg >= 3.5) {
+    return `, con ${formatStatNumber(statSummary.totalXg)} xG combinados que reflejan el volumen ofensivo`;
+  }
+
+  if (statSummary.totalShots >= 24) {
+    return `, con ${statSummary.totalShots} remates que confirman el ritmo ofensivo`;
+  }
+
+  return "";
+}
+
+function formatStatNumber(value) {
+  return Number(value || 0).toFixed(1).replace(/\.0$/, "");
+}
+
+function pushGroupStakesCandidates(candidates, context) {
+  const {
+    homeName,
+    awayName,
+    winnerName,
+    loserName,
+    isDraw,
+    matchday,
+    group,
+    homeAfter,
+    awayAfter,
+    winnerAfter,
+    loserAfter,
+  } = context;
+
+  if (!group || matchday < 2) return;
+
+  if (!isDraw && matchday === 2) {
+    if (Number(winnerAfter.points || 0) >= 6) {
+      candidates.push({
+        priority: 87,
+        source: "editorial-group-stakes",
+        text: `${winnerName} queda muy bien perfilado en el Grupo ${group}: seis puntos de seis y la sensación de tener la clasificación encarrilada.`,
+      });
+    }
+
+    if (Number(loserAfter.points || 0) <= 1) {
+      candidates.push({
+        priority: 86,
+        source: "editorial-group-stakes",
+        text: `${loserName} queda contra la pared en el Grupo ${group}: tendrá que ir por una victoria en la última jornada para sostener sus opciones.`,
+      });
+    }
+  }
+
+  if (isDraw && matchday === 2) {
+    const homePoints = Number(homeAfter.points || 0);
+    const awayPoints = Number(awayAfter.points || 0);
+
+    if (homePoints <= 2 || awayPoints <= 2) {
+      const pressured = homePoints <= awayPoints ? homeName : awayName;
+      candidates.push({
+        priority: 86,
+        source: "editorial-group-stakes",
+        text: `${pressured} suma, pero no respira: el empate deja el Grupo ${group} abierto y obliga a mirar la última jornada con presión real.`,
+      });
+    } else {
+      candidates.push({
+        priority: 82,
+        source: "editorial-group-stakes",
+        text: `${homeName} y ${awayName} dejan el Grupo ${group} al rojo vivo: el punto sirve, pero todavía no despeja el camino a la siguiente fase.`,
+      });
+    }
+  }
+
+  if (matchday === 3) {
+    const winnerPoints = Number(winnerAfter.points || 0);
+    const loserPoints = Number(loserAfter.points || 0);
+
+    if (!isDraw && winnerPoints >= 6) {
+      candidates.push({
+        priority: 90,
+        source: "editorial-group-stakes",
+        text: `${winnerName} responde en el cierre del Grupo ${group} y deja prácticamente encaminado su boleto a la siguiente fase.`,
+      });
+    }
+
+    if (!isDraw && loserPoints <= 3) {
+      candidates.push({
+        priority: 88,
+        source: "editorial-group-stakes",
+        text: `${loserName} se complica en el cierre del Grupo ${group}: la derrota lo deja pendiente de combinaciones y sin margen propio.`,
+      });
+    }
+
+    if (isDraw) {
+      candidates.push({
+        priority: 84,
+        source: "editorial-group-stakes",
+        text: `${homeName} y ${awayName} cierran el Grupo ${group} con un empate que puede valer oro o quedarse corto según las combinaciones.`,
+      });
+    }
+  }
 }
 
 function buildEditorialProfile(name, facts, prior) {
@@ -475,6 +662,24 @@ function extractStatHighlights(rawStats, homeName, awayName) {
   }
 
   return highlights;
+}
+
+function summarizeStats(rawStats) {
+  const statRows = flattenStats(rawStats);
+  const shots = findPair(statRows, ["total shots", "shots", "disparos", "remates"]);
+  const shotsOnTarget = findPair(statRows, ["shots on target", "on target", "tiros a puerta", "remates a puerta"]);
+  const xg = findPair(statRows, ["expected goals", "xg"]);
+
+  return {
+    totalShots: sumPair(shots),
+    totalShotsOnTarget: sumPair(shotsOnTarget),
+    totalXg: sumPair(xg),
+  };
+}
+
+function sumPair(pair) {
+  if (!pair) return 0;
+  return Number(pair.home || 0) + Number(pair.away || 0);
 }
 
 function flattenStats(value, rows = []) {

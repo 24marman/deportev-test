@@ -43,6 +43,8 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Priorizar hitos relevantes: primera victoria mundialista, primer gol mundialista, remontadas, goleadas, invictos, primera victoria del torneo, porteria en cero y stats dominantes.
 - Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
 - Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, batacazo de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
+- Detectar partidazos por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
+- Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos al rojo vivo y cierres sujetos a combinaciones.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
 - No inventar records ni clasificaciones si la data no los sostiene.
@@ -69,6 +71,16 @@ Un RAG puede ser util para la version avanzada, pero no debe bloquear el post fi
 - Al final: no buscar desde cero; solo elegir la mejor narrativa con datos ya preparados.
 
 La capa rapida obligatoria vive en codigo y base curada local, porque esa es la que garantiza velocidad y evita inventar.
+
+## Bot guru futbolistico
+
+El "guru" no es una sola frase generativa; es un sistema de capas:
+
+1. Perfil historico de selecciones: palmares, debut, mejor actuacion, goles/victorias previas.
+2. Lectura de partido: marcador, margen, remontada, goleadores, ritmo, stats y volumen ofensivo.
+3. Lectura de grupo: puntos antes/despues, jornada, presion para clasificar y necesidad de resultados.
+4. Contexto precalentado: h2h, previas, lesionados, rachas y notas relevantes guardadas antes del final.
+5. Selector editorial: elige el angulo mas fuerte y evita que una frase generica tape una historia mejor.
 
 ## Formato actual de tweet
 
