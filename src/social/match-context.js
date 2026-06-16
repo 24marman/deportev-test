@@ -107,6 +107,19 @@ function buildFactCandidates(matchData) {
     awayScore,
     group,
   });
+  pushTeamFormCandidates(candidates, {
+    homeName,
+    awayName,
+    winnerName,
+    loserName,
+    isDraw,
+    teamForm: matchData.context?.teamForm,
+  });
+  pushDayContextCandidates(candidates, {
+    homeName,
+    awayName,
+    day: matchData.context?.day,
+  });
 
   if (!isDraw) {
     pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore);
@@ -431,6 +444,105 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
     priority: 96,
     source: "bsd-incidents:late-decisive-goal",
     text: `${teamName} decidió el partido en el ${minute}${groupPhrase} y suma tres puntos en el cierre.`,
+  });
+}
+
+function getOrdinalFemale(count) {
+  const ordinals = {
+    2: "segunda",
+    3: "tercera",
+    4: "cuarta",
+    5: "quinta",
+  };
+
+  return ordinals[count] || `${count}.ª`;
+}
+
+function pushTeamFormCandidates(candidates, context) {
+  const { homeName, awayName, winnerName, loserName, isDraw, teamForm } = context;
+  if (!teamForm) return;
+
+  if (isDraw) {
+    const homeDraws = teamForm.home?.result === "D" ? Number(teamForm.home.consecutive || 0) : 0;
+    const awayDraws = teamForm.away?.result === "D" ? Number(teamForm.away.consecutive || 0) : 0;
+
+    if (homeDraws >= 2 && awayDraws >= 2) {
+      candidates.push({
+        priority: 84,
+        source: "editorial-team-form",
+        text: `${homeName} y ${awayName} empataron y suman su ${getOrdinalFemale(Math.min(homeDraws, awayDraws))} igualdad consecutiva en el grupo.`,
+      });
+      return;
+    }
+
+    if (homeDraws >= 2) {
+      candidates.push({
+        priority: 83,
+        source: "editorial-team-form",
+        text: `${homeName} empató con ${awayName} y suma su ${getOrdinalFemale(homeDraws)} igualdad consecutiva en el grupo.`,
+      });
+    }
+
+    if (awayDraws >= 2) {
+      candidates.push({
+        priority: 83,
+        source: "editorial-team-form",
+        text: `${awayName} empató con ${homeName} y suma su ${getOrdinalFemale(awayDraws)} igualdad consecutiva en el grupo.`,
+      });
+    }
+
+    return;
+  }
+
+  const winnerIsHome = winnerName === homeName;
+  const winnerForm = winnerIsHome ? teamForm.home : teamForm.away;
+  const loserForm = winnerIsHome ? teamForm.away : teamForm.home;
+  const winnerWins = winnerForm?.result === "W" ? Number(winnerForm.consecutive || 0) : 0;
+  const loserLosses = loserForm?.result === "L" ? Number(loserForm.consecutive || 0) : 0;
+
+  if (loserLosses >= 2) {
+    candidates.push({
+      priority: 89,
+      source: "editorial-team-form",
+      text: `${loserName} perdió ante ${winnerName} y suma su ${getOrdinalFemale(loserLosses)} derrota consecutiva en el grupo.`,
+    });
+  }
+
+  if (winnerWins >= 2) {
+    candidates.push({
+      priority: 86,
+      source: "editorial-team-form",
+      text: `${winnerName} venció a ${loserName} y suma su ${getOrdinalFemale(winnerWins)} victoria consecutiva en el grupo.`,
+    });
+  }
+}
+
+function pushDayContextCandidates(candidates, context) {
+  const { homeName, awayName, day } = context;
+  if (!day?.currentIsDraw || Number(day.drawRunCount || 0) < 2) return;
+
+  if (day.allFinishedDrawDay && Number(day.scheduledCount || 0) >= 3) {
+    candidates.push({
+      priority: 94,
+      source: "editorial-day-context",
+      text: `${homeName} y ${awayName} empataron y completan una jornada marcada por empates.`,
+    });
+    return;
+  }
+
+  if (Number(day.drawRunCount || 0) >= 3) {
+    candidates.push({
+      priority: 85,
+      source: "editorial-day-context",
+      text: `${homeName} y ${awayName} empataron y se suman a una jornada marcada por empates.`,
+    });
+    return;
+  }
+
+  candidates.push({
+    priority: 79,
+    source: "editorial-day-context",
+    text: `${homeName} y ${awayName} empataron y mantienen la tendencia de igualdades del día.`,
   });
 }
 

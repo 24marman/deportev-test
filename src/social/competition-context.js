@@ -1,4 +1,4 @@
-const { findScheduledGroupStageMatch } = require("../lib/world-cup-group-stage-schedule");
+const { GROUP_STAGE_SCHEDULE, findScheduledGroupStageMatch } = require("../lib/world-cup-group-stage-schedule");
 const { normalizeTeamKey } = require("../lib/team-metadata");
 
 function emptyStanding() {
@@ -61,6 +61,136 @@ function getEventTime(event) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function getCurrentEvent(matchData) {
+  return {
+    id: matchData.source?.eventId,
+    event_date: matchData.source?.eventDate,
+    status: "finished",
+    group_name: matchData.competition?.groupLetter ? `Group ${matchData.competition.groupLetter}` : "",
+    round_number: matchData.competition?.matchdayNumber,
+    home_team: matchData.teams?.home?.providerName || matchData.teams?.home?.name,
+    away_team: matchData.teams?.away?.providerName || matchData.teams?.away?.name,
+    home_score: matchData.teams?.home?.score ?? 0,
+    away_score: matchData.teams?.away?.score ?? 0,
+  };
+}
+
+function getEventKey(event) {
+  const scheduled = findScheduledGroupStageMatch(event);
+  const home = normalizeTeamKey(event.home_team || event.teams?.home?.name);
+  const away = normalizeTeamKey(event.away_team || event.teams?.away?.name);
+  return scheduled ? `${scheduled.date}:${scheduled.group}:${home}:${away}` : String(event.id || `${home}:${away}`);
+}
+
+function mergeCurrentEvent(events, currentEvent) {
+  const merged = new Map();
+
+  for (const event of events || []) {
+    if (!event) continue;
+    merged.set(getEventKey(event), event);
+  }
+
+  merged.set(getEventKey(currentEvent), currentEvent);
+  return Array.from(merged.values());
+}
+
+function getResultForTeam(event, teamKey) {
+  const homeKey = normalizeTeamKey(event.home_team);
+  const awayKey = normalizeTeamKey(event.away_team);
+  const homeScore = Number(event.home_score || 0);
+  const awayScore = Number(event.away_score || 0);
+
+  if (homeKey !== teamKey && awayKey !== teamKey) return null;
+  if (homeScore === awayScore) return "D";
+
+  const teamWon = (homeKey === teamKey && homeScore > awayScore) || (awayKey === teamKey && awayScore > homeScore);
+  return teamWon ? "W" : "L";
+}
+
+function getConsecutiveResultCount(results, result) {
+  let count = 0;
+
+  for (let index = results.length - 1; index >= 0; index -= 1) {
+    if (results[index] !== result) break;
+    count += 1;
+  }
+
+  return count;
+}
+
+function buildTeamFormContext(matchData, events = []) {
+  const currentEvent = getCurrentEvent(matchData);
+  const currentTime = getEventTime(currentEvent);
+  const allEvents = mergeCurrentEvent(events, currentEvent)
+    .filter((event) => event?.id && isFinished(event.status) && findScheduledGroupStageMatch(event))
+    .filter((event) => {
+      const eventTime = getEventTime(event);
+      return !currentTime || !eventTime || eventTime <= currentTime || String(event.id) === String(currentEvent.id);
+    })
+    .sort((a, b) => getEventTime(a) - getEventTime(b));
+
+  function build(teamName) {
+    const teamKey = normalizeTeamKey(teamName);
+    const results = allEvents.map((event) => getResultForTeam(event, teamKey)).filter(Boolean);
+    const currentResult = results[results.length - 1] || null;
+
+    return {
+      result: currentResult,
+      results,
+      consecutive: currentResult ? getConsecutiveResultCount(results, currentResult) : 0,
+    };
+  }
+
+  return {
+    home: build(currentEvent.home_team),
+    away: build(currentEvent.away_team),
+  };
+}
+
+function buildDayContext(matchData, events = []) {
+  const currentEvent = getCurrentEvent(matchData);
+  const currentScheduled = findScheduledGroupStageMatch(currentEvent);
+  const currentDate = currentScheduled?.date;
+  const currentTime = getEventTime(currentEvent);
+
+  if (!currentDate) {
+    return null;
+  }
+
+  const allEvents = mergeCurrentEvent(events, currentEvent);
+  const dayEvents = allEvents
+    .filter((event) => {
+      const scheduled = findScheduledGroupStageMatch(event);
+      if (!scheduled || scheduled.date !== currentDate || !isFinished(event.status)) return false;
+
+      const eventTime = getEventTime(event);
+      return !currentTime || !eventTime || eventTime <= currentTime || String(event.id) === String(currentEvent.id);
+    })
+    .map((event) => ({
+      id: String(event.id),
+      homeTeam: event.home_team,
+      awayTeam: event.away_team,
+      homeScore: Number(event.home_score || 0),
+      awayScore: Number(event.away_score || 0),
+      isDraw: Number(event.home_score || 0) === Number(event.away_score || 0),
+    }));
+
+  const scheduledCount = GROUP_STAGE_SCHEDULE.filter((match) => match.date === currentDate).length;
+  const drawCount = dayEvents.filter((event) => event.isDraw).length;
+  const currentIsDraw = Number(currentEvent.home_score || 0) === Number(currentEvent.away_score || 0);
+
+  return {
+    date: currentDate,
+    scheduledCount,
+    finishedCount: dayEvents.length,
+    drawCount,
+    currentIsDraw,
+    allFinishedDrawDay: scheduledCount > 0 && dayEvents.length >= scheduledCount && drawCount >= scheduledCount,
+    drawRunCount: currentIsDraw ? drawCount : 0,
+    events: dayEvents,
+  };
+}
+
 function buildPriorGroupContext(matchData, events = []) {
   const group = matchData.competition?.groupLetter;
   const eventId = String(matchData.source?.eventId || "");
@@ -111,4 +241,6 @@ function buildPriorGroupContext(matchData, events = []) {
 
 module.exports = {
   buildPriorGroupContext,
+  buildDayContext,
+  buildTeamFormContext,
 };
