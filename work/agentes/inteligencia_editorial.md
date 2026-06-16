@@ -67,7 +67,7 @@ El marcador nunca se interpreta solo. Antes de escribir, el agente debe cruzar:
 - Estado del grupo antes del partido.
 - Marcador final, margen, remontada y volumen de goles.
 
-Ejemplo de lectura correcta: un empate de Cabo Verde ante España no es solo "partido cerrado"; es un punto historico para una debutante ante una candidata de peso, y al mismo tiempo un resultado que deja dudas para España.
+Ejemplo de lectura correcta: un empate de Cabo Verde ante España no es solo "partido cerrado"; es un punto historico para una debutante ante una candidata al titulo, y al mismo tiempo un resultado que deja dudas para España.
 
 ## RAG y fuentes externas
 
@@ -99,16 +99,18 @@ El "guru" no es una sola frase generativa; es un sistema de capas:
 - No sonar como transmision televisiva, columna de opinion ni publicacion de aficionados.
 - Cada resumen debe responder: que ocurrio y por que importa.
 - Estructura preferida: resultado + contexto + consecuencia.
+- Regla de tiempo verbal: hecho puntual en pasado + consecuencia vigente en presente. Ejemplo: `Arabia Saudita empato con Uruguay y suma un punto valioso`.
+- Usar presente completo cuando funcione mejor como titular de estado: `Brasil llega a seis puntos tras vencer a Corea del Sur`.
 - Si no hay un angulo claro, preferir texto corto y seco antes que forzar una valoracion.
 - Longitud objetivo: una oracion de 15 a 35 palabras; dos oraciones solo si el contexto lo exige.
 - Evitar exageraciones habituales: `partidazo de locura`, `golpazo brutal`, `resultado increible`, `hazana epica`, `fracaso absoluto`, `espectaculo inolvidable`.
 - Nunca escribir desde la perspectiva de una aficion, seleccion o pais.
 - Usar frases compactas como:
-  - `Canada igualo en el 90+3' y evito la derrota en el Grupo B.`
-  - `Brasil gano en el Grupo B y dio un paso importante en la lucha por la clasificacion.`
+  - `Canada igualo en el 90+3' y evita la derrota en el Grupo B.`
+  - `Brasil llega a seis puntos en el Grupo B tras vencer a Corea del Sur.`
   - `Haiti suma una victoria historica y llega con vida plena a la ultima jornada.`
-  - `Cabo Verde empato con Espana y sumo un punto historico ante una candidata del grupo.`
-  - `Arabia Saudita empato con Uruguay y sumo un punto valioso ante uno de los favoritos del grupo.`
+  - `Cabo Verde suma un punto historico frente a una de las selecciones candidatas al titulo.`
+  - `Arabia Saudita empato con Uruguay y suma un punto valioso ante uno de los favoritos del grupo.`
 - Si una estadistica confirma la historia, integrarla en pocas palabras: `con 12 remates a puerta`, `tras 30 remates`, `con dominio total`.
 
 ## Formato actual de tweet
