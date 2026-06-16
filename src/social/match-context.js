@@ -65,6 +65,7 @@ function buildFactCandidates(matchData) {
   const awayAfter = prior.awayAfter || projectStanding(awayPrior, awayScore, homeScore);
   const stats = extractStatHighlights(matchData.context?.matchStats, homeName, awayName);
   const statSummary = summarizeStats(matchData.context?.matchStats);
+  const matchIntelligence = analyzeMatchIntelligence(matchData.context?.matchStats);
   const scoring = getScoringStory(matchData);
   const decisiveLateGoal = getDecisiveLateGoalStory(matchData);
   const candidates = [];
@@ -128,6 +129,18 @@ function buildFactCandidates(matchData) {
     homeScore,
     awayScore,
     statSummary,
+  });
+  pushMatchIntelligenceCandidates(candidates, {
+    homeName,
+    awayName,
+    homeProfile,
+    awayProfile,
+    homeScore,
+    awayScore,
+    totalGoals,
+    statSummary,
+    matchIntelligence,
+    group,
   });
 
   if (!isDraw) {
@@ -631,6 +644,437 @@ function getFavoriteDominancePhrase(dominance) {
   }
 
   return parts.length ? ` con ${parts.slice(0, 2).join(" y ")}` : " las estadísticas";
+}
+
+function pushMatchIntelligenceCandidates(candidates, context) {
+  const {
+    homeName,
+    awayName,
+    homeProfile,
+    awayProfile,
+    homeScore,
+    awayScore,
+    totalGoals,
+    statSummary,
+    matchIntelligence,
+    group,
+  } = context;
+
+  if (!matchIntelligence) return;
+
+  const isDraw = homeScore === awayScore;
+  const winnerSide = homeScore > awayScore ? "home" : awayScore > homeScore ? "away" : null;
+  const winnerName = winnerSide === "home" ? homeName : awayName;
+  const loserName = winnerSide === "home" ? awayName : homeName;
+  const chanceLeader = matchIntelligence.chanceLeader;
+  const latePressure = matchIntelligence.latePressureLeader;
+  const groupPhrase = group ? ` en el Grupo ${group}` : "";
+
+  if (isDraw && chanceLeader?.strong) {
+    const dominantName = chanceLeader.side === "home" ? homeName : awayName;
+    const resistantName = chanceLeader.side === "home" ? awayName : homeName;
+    const dominantProfile = chanceLeader.side === "home" ? homeProfile : awayProfile;
+    const resistantProfile = chanceLeader.side === "home" ? awayProfile : homeProfile;
+    const matchup = getFavoriteUnderdog(dominantProfile, resistantProfile);
+    const resistantIsUnderdog = matchup?.underdog === resistantProfile;
+    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
+    const consequence = resistantIsUnderdog
+      ? resistantProfile.debutant
+        ? "suma un punto histórico"
+        : "suma un punto valioso"
+      : "rescata un empate valioso";
+
+    candidates.push({
+      priority: resistantIsUnderdog ? 101 : 94,
+      source: "bsd-advanced-stats:chance-quality",
+      signature: resistantIsUnderdog ? "underdog-resists-clear-chances-draw" : "team-resists-clear-chances-draw",
+      text: `${dominantName} generó las más claras${statPhrase}, pero ${resistantName} resistió y ${consequence}.`,
+    });
+  }
+
+  if (!isDraw && chanceLeader?.strong && chanceLeader.side === winnerSide) {
+    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
+    candidates.push({
+      priority: 90,
+      source: "bsd-advanced-stats:chance-quality",
+      signature: "winner-creates-clearer-chances",
+      text: `${winnerName} generó las ocasiones más claras${statPhrase} y convierte su superioridad en tres puntos${groupPhrase}.`,
+    });
+  }
+
+  if (!isDraw && chanceLeader?.strong && chanceLeader.side !== winnerSide) {
+    const dominantName = chanceLeader.side === "home" ? homeName : awayName;
+    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
+    candidates.push({
+      priority: 92,
+      source: "bsd-advanced-stats:efficiency",
+      signature: "winner-survives-opponent-clear-chances",
+      text: `${dominantName} generó más peligro${statPhrase}, pero ${winnerName} fue más eficaz y se queda con la victoria.`,
+    });
+  }
+
+  if (latePressure?.strong && isDraw && totalGoals <= 2) {
+    const pressureName = latePressure.side === "home" ? homeName : awayName;
+    const resistantName = latePressure.side === "home" ? awayName : homeName;
+
+    candidates.push({
+      priority: 91,
+      source: "bsd-advanced-stats:late-pressure",
+      signature: "late-pressure-draw",
+      text: `${pressureName} empujó en el tramo final, pero ${resistantName} resistió y sostiene un punto importante.`,
+    });
+  }
+
+  if (latePressure?.strong && !isDraw && latePressure.side === winnerSide) {
+    candidates.push({
+      priority: 87,
+      source: "bsd-advanced-stats:late-pressure",
+      signature: "winner-closes-with-pressure",
+      text: `${winnerName} cerró con más peligro y terminó asegurando una victoria importante ante ${loserName}.`,
+    });
+  }
+
+  if (matchIntelligence.bigChancePair) {
+    const dominant = getDominant(matchIntelligence.bigChancePair, 3);
+    if (dominant) {
+      const teamName = dominant.side === "home" ? homeName : awayName;
+      candidates.push({
+        priority: 86,
+        source: "bsd-advanced-stats:big-chances",
+        signature: "big-chances-domination",
+        text: `${teamName} acumuló las oportunidades más claras y marcó el tono ofensivo del partido.`,
+      });
+    }
+  }
+}
+
+function getChanceLeaderPhrase(leader, statSummary) {
+  const parts = [];
+  const side = leader.side;
+
+  if (statSummary?.shots?.[side] >= 18) {
+    parts.push(`${formatStatNumber(statSummary.shots[side])} remates`);
+  }
+
+  if (statSummary?.xg?.[side] >= 1.5) {
+    parts.push(`${formatXgNumber(statSummary.xg[side])} xG`);
+  }
+
+  if (!parts.length && statSummary?.bigChances?.[side] >= 3) {
+    parts.push(`${formatStatNumber(statSummary.bigChances[side])} ocasiones claras`);
+  }
+
+  if (!parts.length && statSummary?.dangerousAttacks?.[side] >= 55) {
+    parts.push(`${formatStatNumber(statSummary.dangerousAttacks[side])} ataques peligrosos`);
+  }
+
+  if (!parts.length && leader.clearChances >= 2) {
+    parts.push(`${leader.clearChances} ocasiones claras`);
+  }
+
+  return parts.length ? ` con ${parts.slice(0, 2).join(" y ")}` : "";
+}
+
+function analyzeMatchIntelligence(rawStats) {
+  if (!rawStats) return null;
+
+  const statRows = flattenStats(rawStats);
+  const statSummary = summarizeStats(rawStats);
+  const bigChancePair = findPair(statRows, [
+    "big chances",
+    "clear chances",
+    "big chance",
+    "occasiones claras",
+    "chances claras",
+    "grandes ocasiones",
+  ]);
+  const shotEvents = extractShotEvents(rawStats);
+  const xgTimeline = extractTimelinePairs(rawStats, ["xg", "expected goals"]);
+  const momentumTimeline = extractTimelinePairs(rawStats, ["momentum", "pressure"]);
+  const shotSummary = summarizeShotEvents(shotEvents);
+
+  return {
+    shotEvents,
+    xgTimeline,
+    momentumTimeline,
+    bigChancePair,
+    shotSummary,
+    chanceLeader: getChanceLeader({ statSummary, bigChancePair, shotSummary, xgTimeline }),
+    latePressureLeader: getLatePressureLeader({ shotSummary, xgTimeline, momentumTimeline }),
+  };
+}
+
+function getChanceLeader({ statSummary, bigChancePair, shotSummary, xgTimeline }) {
+  const scores = {
+    home: 0,
+    away: 0,
+  };
+  const clearChances = {
+    home: 0,
+    away: 0,
+  };
+
+  for (const side of ["home", "away"]) {
+    const opposite = oppositeSide(side);
+
+    if (bigChancePair?.[side] != null) {
+      scores[side] += Number(bigChancePair[side] || 0) * 3;
+      clearChances[side] += Number(bigChancePair[side] || 0);
+    }
+
+    if (shotSummary?.[side]) {
+      scores[side] += Number(shotSummary[side].xg || 0) * 2.8;
+      scores[side] += Number(shotSummary[side].clearChances || 0) * 3;
+      scores[side] += Number(shotSummary[side].shotsOnTarget || 0) * 0.8;
+      clearChances[side] += Number(shotSummary[side].clearChances || 0);
+    }
+
+    if (statSummary?.xg?.[side] != null) {
+      const xgDiff = Number(statSummary.xg[side] || 0) - Number(statSummary.xg[opposite] || 0);
+      if (xgDiff > 0) scores[side] += xgDiff * 3;
+    }
+
+    if (statSummary?.shotsOnTarget?.[side] != null) {
+      const sotDiff = Number(statSummary.shotsOnTarget[side] || 0) - Number(statSummary.shotsOnTarget[opposite] || 0);
+      if (sotDiff > 0) scores[side] += sotDiff * 0.9;
+    }
+
+    if (statSummary?.dangerousAttacks?.[side] != null) {
+      const dangerDiff = Number(statSummary.dangerousAttacks[side] || 0) - Number(statSummary.dangerousAttacks[opposite] || 0);
+      if (dangerDiff > 0) scores[side] += Math.min(6, dangerDiff * 0.08);
+    }
+
+    if (statSummary?.touchesInPenaltyArea?.[side] != null) {
+      const areaDiff =
+        Number(statSummary.touchesInPenaltyArea[side] || 0) - Number(statSummary.touchesInPenaltyArea[opposite] || 0);
+      if (areaDiff > 0) scores[side] += Math.min(5, areaDiff * 0.18);
+    }
+
+    const xgTimelineTotal = sumTimelineSide(xgTimeline, side);
+    const xgTimelineOpposite = sumTimelineSide(xgTimeline, opposite);
+    if (xgTimelineTotal > xgTimelineOpposite) {
+      scores[side] += (xgTimelineTotal - xgTimelineOpposite) * 2.2;
+    }
+  }
+
+  const side = scores.home >= scores.away ? "home" : "away";
+  const opposite = oppositeSide(side);
+  const diff = scores[side] - scores[opposite];
+  const strong =
+    diff >= 4 ||
+    clearChances[side] >= clearChances[opposite] + 2 ||
+    (statSummary?.xg?.[side] >= 1.8 && statSummary.xg[side] - statSummary.xg[opposite] >= 1) ||
+    (statSummary?.dangerousAttacks?.[side] >= 55 &&
+      statSummary.dangerousAttacks[side] - statSummary.dangerousAttacks[opposite] >= 30);
+
+  if (!strong) return null;
+
+  return {
+    side,
+    score: scores[side],
+    diff,
+    clearChances: clearChances[side],
+    strong,
+  };
+}
+
+function getLatePressureLeader({ shotSummary, xgTimeline, momentumTimeline }) {
+  const late = {
+    home: 0,
+    away: 0,
+  };
+
+  for (const side of ["home", "away"]) {
+    const shots = shotSummary?.[side]?.late || {};
+    late[side] += Number(shots.xg || 0) * 3;
+    late[side] += Number(shots.shots || 0) * 0.8;
+    late[side] += Number(shots.shotsOnTarget || 0) * 1.2;
+    late[side] += sumTimelineSide(xgTimeline, side, 75) * 2.5;
+    late[side] += positiveMomentumScore(momentumTimeline, side, 75) * 0.15;
+  }
+
+  const side = late.home >= late.away ? "home" : "away";
+  const diff = late[side] - late[oppositeSide(side)];
+  if (diff < 2.5) return null;
+
+  return {
+    side,
+    score: late[side],
+    diff,
+    strong: true,
+  };
+}
+
+function summarizeShotEvents(events = []) {
+  const summary = {
+    home: emptyShotSideSummary(),
+    away: emptyShotSideSummary(),
+  };
+
+  for (const event of events) {
+    if (!event.side || !summary[event.side]) continue;
+    const target = summary[event.side];
+    const xg = Number(event.xg || 0);
+
+    target.shots += 1;
+    target.xg += xg;
+    if (event.onTarget) target.shotsOnTarget += 1;
+    if (event.bigChance || xg >= 0.25) target.clearChances += 1;
+
+    if (event.minuteValue >= 75) {
+      target.late.shots += 1;
+      target.late.xg += xg;
+      if (event.onTarget) target.late.shotsOnTarget += 1;
+    }
+  }
+
+  return summary;
+}
+
+function emptyShotSideSummary() {
+  return {
+    shots: 0,
+    shotsOnTarget: 0,
+    xg: 0,
+    clearChances: 0,
+    late: {
+      shots: 0,
+      shotsOnTarget: 0,
+      xg: 0,
+    },
+  };
+}
+
+function extractShotEvents(rawStats) {
+  const events = [];
+  collectShotEvents(rawStats, [], events);
+  return events;
+}
+
+function collectShotEvents(value, pathParts, events) {
+  if (!value) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectShotEvents(item, pathParts.concat(String(index)), events));
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const pathText = pathParts.join(" ").toLowerCase();
+  const hasShotContext =
+    pathText.includes("shot") ||
+    pathText.includes("tiro") ||
+    pathText.includes("remate") ||
+    value.shot_type ||
+    value.shotType ||
+    value.is_shot ||
+    value.xg != null ||
+    value.expected_goals != null ||
+    value.expectedGoals != null;
+
+  if (hasShotContext) {
+    const side = inferSide(value, pathParts);
+    const xg = firstNumber(value.xg, value.expected_goals, value.expectedGoals, value.expected_goal, value.expectedGoal);
+    const minuteValue = firstNumber(value.minute, value.min, value.time, value.match_minute, value.matchMinute, value.period_minute);
+    const outcome = String(value.outcome || value.result || value.shot_result || value.shotResult || value.type || "").toLowerCase();
+    const onTarget = /goal|saved|on target|target|blocked on line|a puerta/.test(outcome);
+    const bigChance = Boolean(value.big_chance || value.bigChance || value.is_big_chance || value.isBigChance);
+
+    if (side && (xg != null || minuteValue != null || outcome || bigChance)) {
+      events.push({
+        side,
+        xg: xg || 0,
+        minuteValue: Number(minuteValue || 0),
+        outcome,
+        onTarget,
+        bigChance,
+      });
+    }
+  }
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (nested && typeof nested === "object") collectShotEvents(nested, pathParts.concat(key), events);
+  }
+}
+
+function extractTimelinePairs(rawStats, aliases) {
+  const rows = [];
+  collectTimelinePairs(rawStats, [], aliases, rows);
+  return rows;
+}
+
+function collectTimelinePairs(value, pathParts, aliases, rows) {
+  if (!value) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectTimelinePairs(item, pathParts.concat(String(index)), aliases, rows));
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const pathText = pathParts.join(" ").toLowerCase();
+  const isRelevantPath = aliases.some((alias) => pathText.includes(alias));
+  const minute = firstNumber(value.minute, value.min, value.time, value.match_minute, value.matchMinute);
+  const home = value.home ?? value.home_value ?? value.homeValue ?? value.home_team ?? value.homeTeam;
+  const away = value.away ?? value.away_value ?? value.awayValue ?? value.away_team ?? value.awayTeam;
+
+  if (isRelevantPath && minute != null && home !== undefined && away !== undefined) {
+    rows.push({
+      minute: Number(minute),
+      home: toNumber(home) || 0,
+      away: toNumber(away) || 0,
+    });
+  }
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (nested && typeof nested === "object") collectTimelinePairs(nested, pathParts.concat(key), aliases, rows);
+  }
+}
+
+function inferSide(value, pathParts) {
+  if (value.is_home === true || value.isHome === true) return "home";
+  if (value.is_home === false || value.isHome === false) return "away";
+  if (value.home === true) return "home";
+  if (value.home === false) return "away";
+
+  const rawSide = String(
+    value.side || value.team_side || value.teamSide || value.home_away || value.homeAway || value.location || "",
+  ).toLowerCase();
+  if (/\bhome\b|local|casa/.test(rawSide)) return "home";
+  if (/\baway\b|visitor|visitante|fuera/.test(rawSide)) return "away";
+
+  const pathText = pathParts.join(" ").toLowerCase();
+  if (/\bhome\b|local|casa/.test(pathText)) return "home";
+  if (/\baway\b|visitor|visitante|fuera/.test(pathText)) return "away";
+
+  return null;
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const parsed = Number(String(value).replace("%", "").trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+function sumTimelineSide(rows = [], side, minMinute = null) {
+  return rows
+    .filter((row) => minMinute == null || Number(row.minute || 0) >= minMinute)
+    .reduce((total, row) => total + Number(row[side] || 0), 0);
+}
+
+function positiveMomentumScore(rows = [], side, minMinute = null) {
+  return rows
+    .filter((row) => minMinute == null || Number(row.minute || 0) >= minMinute)
+    .reduce((total, row) => {
+      const diff = Number(row[side] || 0) - Number(row[oppositeSide(side)] || 0);
+      return total + Math.max(0, diff);
+    }, 0);
 }
 
 function formatStatNumber(value) {
@@ -1203,12 +1647,23 @@ function summarizeStats(rawStats) {
   const shots = findPair(statRows, ["total shots", "shots", "disparos", "remates"]);
   const shotsOnTarget = findPair(statRows, ["shots on target", "on target", "tiros a puerta", "remates a puerta"]);
   const xg = findPair(statRows, ["expected goals", "xg"]);
+  const bigChances = findPair(statRows, ["big chances", "clear chances", "occasiones claras", "chances claras"]);
+  const dangerousAttacks = findPair(statRows, ["dangerous attack", "dangerous attacks", "ataques peligrosos"]);
+  const touchesInPenaltyArea = findPair(statRows, [
+    "touches in penalty area",
+    "touches penalty area",
+    "toques en area",
+    "toques en el area",
+  ]);
 
   return {
     possession,
     shots,
     shotsOnTarget,
     xg,
+    bigChances,
+    dangerousAttacks,
+    touchesInPenaltyArea,
     totalShots: sumPair(shots),
     totalShotsOnTarget: sumPair(shotsOnTarget),
     totalXg: sumPair(xg),
@@ -1230,6 +1685,8 @@ function flattenStats(value, rows = []) {
 
   if (typeof value !== "object") return rows;
 
+  collectTeamBucketRows(value, rows);
+
   const name = value.name || value.type || value.key || value.stat || value.label || value.title;
   const home = value.home ?? value.home_value ?? value.homeValue ?? value.home_team ?? value.homeTeam;
   const away = value.away ?? value.away_value ?? value.awayValue ?? value.away_team ?? value.awayTeam;
@@ -1245,8 +1702,63 @@ function flattenStats(value, rows = []) {
   return rows;
 }
 
+function collectTeamBucketRows(value, rows) {
+  const homeBucket = value.home;
+  const awayBucket = value.away;
+
+  if (!isPlainObject(homeBucket) || !isPlainObject(awayBucket)) return;
+
+  const pairs = extractSharedNumericStats(homeBucket, awayBucket);
+  for (const pair of pairs) {
+    rows.push(pair);
+  }
+}
+
+function extractSharedNumericStats(homeBucket, awayBucket, prefix = "") {
+  const rows = [];
+  const keys = new Set([...Object.keys(homeBucket || {}), ...Object.keys(awayBucket || {})]);
+
+  for (const key of keys) {
+    const homeValue = homeBucket[key];
+    const awayValue = awayBucket[key];
+    const name = prefix ? `${prefix} ${key}` : key;
+
+    if (isPlainObject(homeValue) && isPlainObject(awayValue)) {
+      rows.push(...extractSharedNumericStats(homeValue, awayValue, name));
+      continue;
+    }
+
+    const homeNumber = toNumber(homeValue);
+    const awayNumber = toNumber(awayValue);
+    if (homeNumber == null || awayNumber == null) continue;
+
+    rows.push({
+      name: normalizeStatName(name),
+      home: homeNumber,
+      away: awayNumber,
+    });
+  }
+
+  return rows;
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeStatName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function findPair(rows, aliases) {
-  return rows.find((row) => aliases.some((alias) => row.name.includes(alias)) && row.home != null && row.away != null);
+  const normalizedAliases = aliases.map(normalizeStatName);
+  return rows.find(
+    (row) => normalizedAliases.some((alias) => normalizeStatName(row.name).includes(alias)) && row.home != null && row.away != null,
+  );
 }
 
 function toNumber(value) {

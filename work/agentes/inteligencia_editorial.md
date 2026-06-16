@@ -7,6 +7,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 ## Fuentes permitidas
 
 - BSD Football API: evento, incidentes, stats, metadata, h2h y calendario.
+- BSD advanced match stats: shotmap, xG por minuto, momentum, ocasiones claras, ataques peligrosos, toques en area, remates y remates a puerta.
 - Tabla de grupo calculada con partidos previos del Mundial 2026.
 - Contexto del dia calculado con todos los partidos de fase de grupos ya finalizados.
 - Forma reciente por seleccion dentro del grupo: victorias, empates o derrotas consecutivas.
@@ -65,6 +66,9 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Usar estadisticas solo cuando expliquen el resultado. Priorizar tendencias: mas ocasiones, posesion, peligro ofensivo, eficacia o dominio.
 - Cuando las estadisticas contradicen el marcador, pueden ser el angulo principal: favorito domina posesion, xG, remates o tiros a puerta, pero no logra ganar; rival resiste y sostiene un resultado valioso.
 - Para activar ese angulo deben existir al menos dos senales fuertes de dominio, no una sola cifra aislada.
+- Leer shotmap, xG por minuto y momentum para detectar quien tuvo las ocasiones mas claras, si hubo presion final o si el resultado fue contra el flujo del partido.
+- Leer `big_chances`, `dangerous_attack` y `touches_in_penalty_area` como respaldo cuando el shotmap venga incompleto.
+- Si un equipo domina las ocasiones claras y no gana, priorizar esa lectura sobre una frase generica de empate.
 
 ## Criterio editorial de jerarquia
 
