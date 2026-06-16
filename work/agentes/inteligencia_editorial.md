@@ -63,6 +63,8 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Nombrar el contexto especifico: rival, favorito, debutante, grupo, momento del gol, consecuencia o duda que deja el resultado. No usar frases comodin tipo "senal de caracter" si no agregan una lectura unica.
 - Mantener intensidad proporcional: partidos normales se describen sobrios; hechos excepcionales solo se destacan si la data lo justifica.
 - Usar estadisticas solo cuando expliquen el resultado. Priorizar tendencias: mas ocasiones, posesion, peligro ofensivo, eficacia o dominio.
+- Cuando las estadisticas contradicen el marcador, pueden ser el angulo principal: favorito domina posesion, xG, remates o tiros a puerta, pero no logra ganar; rival resiste y sostiene un resultado valioso.
+- Para activar ese angulo deben existir al menos dos senales fuertes de dominio, no una sola cifra aislada.
 
 ## Criterio editorial de jerarquia
 

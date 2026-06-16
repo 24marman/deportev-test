@@ -120,6 +120,15 @@ function buildFactCandidates(matchData) {
     awayName,
     day: matchData.context?.day,
   });
+  pushDominantFavoriteDrawCandidate(candidates, {
+    homeName,
+    awayName,
+    homeProfile,
+    awayProfile,
+    homeScore,
+    awayScore,
+    statSummary,
+  });
 
   if (!isDraw) {
     pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore);
@@ -547,8 +556,89 @@ function pushDayContextCandidates(candidates, context) {
   });
 }
 
+function pushDominantFavoriteDrawCandidate(candidates, context) {
+  const { homeName, awayName, homeProfile, awayProfile, homeScore, awayScore, statSummary } = context;
+  if (homeScore !== awayScore || !statSummary) return;
+
+  const matchup = getFavoriteUnderdog(homeProfile, awayProfile);
+  if (!matchup) return;
+
+  const favoriteSide = matchup.favorite.name === homeName ? "home" : "away";
+  const dominance = getStatDominance(statSummary, favoriteSide);
+  if (!dominance) return;
+
+  const scoreless = Number(homeScore || 0) + Number(awayScore || 0) === 0;
+  const statPhrase = getFavoriteDominancePhrase(dominance);
+  const resultPhrase = matchup.underdog.debutant
+    ? "suma un empate histórico"
+    : "rescata un punto de gran valor";
+
+  candidates.push({
+    priority: scoreless ? 99 : 96,
+    source: "editorial-stats-dominance",
+    signature: scoreless ? "favorite-dominates-stats-underdog-scoreless-draw" : "favorite-dominates-stats-underdog-draw",
+    text: `${matchup.favorite.name} dominó${statPhrase}, pero ${matchup.underdog.name} resistió y ${resultPhrase}.`,
+  });
+}
+
+function getStatDominance(statSummary, side) {
+  const signals = [];
+
+  function addSignal(name, pair, isDominant) {
+    if (!pair || !isDominant(pair)) return;
+    signals.push({ name, pair, value: pair[side], diff: Math.abs(Number(pair.home || 0) - Number(pair.away || 0)) });
+  }
+
+  addSignal("possession", statSummary.possession, (pair) => pair[side] >= 65 && pair[side] - pair[oppositeSide(side)] >= 18);
+  addSignal("xg", statSummary.xg, (pair) => pair[side] >= 1.8 && pair[side] - pair[oppositeSide(side)] >= 1.1);
+  addSignal("shots", statSummary.shots, (pair) => pair[side] >= 18 && pair[side] - pair[oppositeSide(side)] >= 10);
+  addSignal(
+    "shotsOnTarget",
+    statSummary.shotsOnTarget,
+    (pair) => pair[side] >= 6 && pair[side] - pair[oppositeSide(side)] >= 4,
+  );
+
+  if (signals.length < 2) return null;
+
+  return {
+    side,
+    signals,
+    possession: statSummary.possession,
+    xg: statSummary.xg,
+    shots: statSummary.shots,
+    shotsOnTarget: statSummary.shotsOnTarget,
+  };
+}
+
+function oppositeSide(side) {
+  return side === "home" ? "away" : "home";
+}
+
+function getFavoriteDominancePhrase(dominance) {
+  const side = dominance.side;
+  const parts = [];
+
+  if (dominance.shots?.[side] >= 20) {
+    parts.push(`${formatStatNumber(dominance.shots[side])} remates`);
+  }
+
+  if (dominance.xg?.[side] >= 1.8) {
+    parts.push(`${formatXgNumber(dominance.xg[side])} xG`);
+  }
+
+  if (!parts.length && dominance.possession?.[side] >= 65) {
+    parts.push(`${formatStatNumber(dominance.possession[side])}% de posesión`);
+  }
+
+  return parts.length ? ` con ${parts.slice(0, 2).join(" y ")}` : " las estadísticas";
+}
+
 function formatStatNumber(value) {
   return Number(value || 0).toFixed(1).replace(/\.0$/, "");
+}
+
+function formatXgNumber(value) {
+  return Number(value || 0).toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
 }
 
 function pushGroupStakesCandidates(candidates, context) {
@@ -1109,11 +1199,16 @@ function extractStatHighlights(rawStats, homeName, awayName) {
 
 function summarizeStats(rawStats) {
   const statRows = flattenStats(rawStats);
+  const possession = findPair(statRows, ["possession", "ball possession", "posesion", "posesión"]);
   const shots = findPair(statRows, ["total shots", "shots", "disparos", "remates"]);
   const shotsOnTarget = findPair(statRows, ["shots on target", "on target", "tiros a puerta", "remates a puerta"]);
   const xg = findPair(statRows, ["expected goals", "xg"]);
 
   return {
+    possession,
+    shots,
+    shotsOnTarget,
+    xg,
     totalShots: sumPair(shots),
     totalShotsOnTarget: sumPair(shotsOnTarget),
     totalXg: sumPair(xg),
