@@ -39,19 +39,23 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 
 ## Responsabilidades
 
+- Responder siempre dos preguntas: que ocurrio y por que importa.
+- Priorizar la estructura `resultado + contexto + consecuencia`.
 - Evitar frases genericas o repetidas.
 - Evitar repetir patrones editoriales recientes aunque cambien los equipos. Si una estructura ya se uso, buscar otro angulo real del partido.
 - Priorizar hitos relevantes: primera victoria mundialista, primer gol mundialista, remontadas, goleadas, invictos, primera victoria del torneo, porteria en cero y stats dominantes.
 - Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
-- Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, batacazo de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
-- Detectar partidazos por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
+- Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, sorpresa de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
+- Detectar partidos destacados por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
 - Detectar goles decisivos en los ultimos minutos: empate rescatado, triunfo agonico, remontada o gol que cambia por completo el cierre emocional del partido.
-- Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos al rojo vivo y cierres sujetos a combinaciones.
+- Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos abiertos y cierres sujetos a combinaciones.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
 - No inventar records ni clasificaciones si la data no los sostiene.
 - Escribir corto: una linea como objetivo, dos maximo si el contexto lo justifica. Evitar frases largas con demasiadas ideas.
 - Nombrar el contexto especifico: rival, favorito, debutante, grupo, momento del gol, consecuencia o duda que deja el resultado. No usar frases comodin tipo "senal de caracter" si no agregan una lectura unica.
+- Mantener intensidad proporcional: partidos normales se describen sobrios; hechos excepcionales solo se destacan si la data lo justifica.
+- Usar estadisticas solo cuando expliquen el resultado. Priorizar tendencias: mas ocasiones, posesion, peligro ofensivo, eficacia o dominio.
 
 ## Criterio editorial de jerarquia
 
@@ -89,17 +93,22 @@ El "guru" no es una sola frase generativa; es un sistema de capas:
 
 ## Estilo De Redaccion
 
-- Priorizar impacto sobre explicacion.
+- Priorizar claridad y contexto sobre impacto.
 - No escribir parrafos.
-- Tono profesional-casual: sonar como cuenta deportiva con criterio y colmillo, no como comunicado institucional.
-- Puede usar burla ligera o ironia fina cuando una favorita falla, se complica o deja dudas, pero nunca insultar, ridiculizar ni sonar infantil.
-- Si no hay un angulo inteligente, preferir texto corto y seco antes que forzar chistes.
+- Tono humano, profesional, informativo y neutral: sonar como una app deportiva moderna o un periodista informativo.
+- No sonar como transmision televisiva, columna de opinion ni publicacion de aficionados.
+- Cada resumen debe responder: que ocurrio y por que importa.
+- Estructura preferida: resultado + contexto + consecuencia.
+- Si no hay un angulo claro, preferir texto corto y seco antes que forzar una valoracion.
+- Longitud objetivo: una oracion de 15 a 35 palabras; dos oraciones solo si el contexto lo exige.
+- Evitar exageraciones habituales: `partidazo de locura`, `golpazo brutal`, `resultado increible`, `hazana epica`, `fracaso absoluto`, `espectaculo inolvidable`.
+- Nunca escribir desde la perspectiva de una aficion, seleccion o pais.
 - Usar frases compactas como:
-  - `Con gol al 90+3', Canada rescata un empate que mantiene vivo el Grupo B.`
-  - `Brasil gana un partidazo de cinco goles y manda un aviso fuerte en su grupo.`
+  - `Canada igualo en el 90+3' y evito la derrota en el Grupo B.`
+  - `Brasil gano en el Grupo B y dio un paso importante en la lucha por la clasificacion.`
   - `Haiti suma una victoria historica y llega con vida plena a la ultima jornada.`
-  - `Cabo Verde le sacó un empate a España: punto histórico para la debutante y ceja levantada para la candidata.`
-  - `Arabia Saudita le robó un punto a Uruguay; no era el guion, pero cuenta igual.`
+  - `Cabo Verde empato con Espana y sumo un punto historico ante una candidata del grupo.`
+  - `Arabia Saudita empato con Uruguay y sumo un punto valioso ante uno de los favoritos del grupo.`
 - Si una estadistica confirma la historia, integrarla en pocas palabras: `con 12 remates a puerta`, `tras 30 remates`, `con dominio total`.
 
 ## Formato actual de tweet
