@@ -82,6 +82,7 @@ async function renderEvent(eventId, options = {}) {
     publishFinalScorePost({
       matchData,
       imagePath: outputPath,
+      recentEditorialSignatures: options.recentEditorialSignatures,
     }),
   ]);
 
@@ -282,6 +283,7 @@ async function processFinishedEvent(event, state, contextEvents) {
   const result = await renderEvent(eventId, {
     contextEvents,
     warmedRecord: state.matches[eventId],
+    recentEditorialSignatures: getRecentEditorialSignatures(state, eventId),
   });
 
   state.matches[eventId] = {
@@ -291,6 +293,9 @@ async function processFinishedEvent(event, state, contextEvents) {
     outputPath: result.outputPath,
     publicUrl: result.uploadResult?.publicUrl || null,
     tweetUrl: result.socialResult?.tweetUrl || null,
+    editorialHeadline: result.socialResult?.editorialContext?.headline || null,
+    editorialSource: result.socialResult?.editorialContext?.source || null,
+    editorialSignature: result.socialResult?.editorialContext?.signature || null,
     xPostMode: result.socialResult?.mode || null,
     xPublished: Boolean(result.socialResult?.published),
   };
@@ -298,6 +303,14 @@ async function processFinishedEvent(event, state, contextEvents) {
   await saveMonitorState(state);
   console.log(`Processed final BSD event ${eventId}`);
   return state;
+}
+
+function getRecentEditorialSignatures(state, currentEventId, limit = 8) {
+  return Object.entries(state.matches || {})
+    .filter(([eventId, record]) => eventId !== String(currentEventId) && record?.editorialSignature)
+    .sort((a, b) => new Date(b[1].processedAt || b[1].renderCompletedAt || 0) - new Date(a[1].processedAt || a[1].renderCompletedAt || 0))
+    .slice(0, limit)
+    .map(([, record]) => record.editorialSignature);
 }
 
 async function maybeWarmEditorialContext(eventId, state, contextEvents) {

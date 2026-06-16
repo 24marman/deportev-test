@@ -19,7 +19,7 @@ function getTeamFacts(name) {
   return TEAM_FACTS[normalizeTeamKey(name)] || {};
 }
 
-function getInternalContext(matchData) {
+function getInternalContext(matchData, options = {}) {
   const facts = buildFactCandidates(matchData);
   const warmed = matchData.context?.warmedEditorial?.context;
 
@@ -34,12 +34,14 @@ function getInternalContext(matchData) {
     facts.sort((a, b) => b.priority - a.priority);
   }
 
-  const headline = pickHeadline(facts, matchData);
+  const rankedFacts = rankCandidatesForRecentUsage(facts, options.recentEditorialSignatures);
+  const picked = pickHeadlineCandidate(rankedFacts, matchData);
 
   return {
-    source: facts[0]?.source || "internal-editorial-engine",
-    headline,
-    facts,
+    source: picked?.source || "internal-editorial-engine",
+    headline: picked?.text || "",
+    signature: picked?.signature || getEditorialSignature(picked?.text),
+    facts: rankedFacts,
   };
 }
 
@@ -192,7 +194,7 @@ function buildFactCandidates(matchData) {
       });
     }
   } else {
-    pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore);
+    pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore, { group, matchday });
 
     if (totalGoals >= 4) {
       candidates.push({
@@ -281,11 +283,53 @@ function buildFactCandidates(matchData) {
 }
 
 function pickHeadline(candidates, matchData) {
+  return pickHeadlineCandidate(candidates, matchData)?.text || "";
+}
+
+function pickHeadlineCandidate(candidates, matchData) {
   const topPriority = candidates[0]?.priority || 0;
   const spread = topPriority >= 90 ? 2 : 5;
   const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
-  return (topBand[Math.abs(seed) % topBand.length] || candidates[0] || {}).text || "";
+  return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
+}
+
+function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []) {
+  const recent = new Set((recentEditorialSignatures || []).filter(Boolean));
+
+  return candidates
+    .map((candidate) => {
+      const signature = candidate.signature || getEditorialSignature(candidate.text);
+      const repeatPenalty = recent.has(signature) ? 18 : 0;
+
+      return {
+        ...candidate,
+        signature,
+        priority: Number(candidate.priority || 0) - repeatPenalty,
+        originalPriority: candidate.priority,
+        repeatPenalty,
+      };
+    })
+    .sort((a, b) => b.priority - a.priority);
+}
+
+function getEditorialSignature(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[0-9]+(?:\+[0-9]+)?'/g, "MIN")
+    .replace(/[0-9]+-[0-9]+/g, "SCORE")
+    .replace(/\b(grupo)\s+[a-z]\b/g, "$1 X")
+    .replace(/\b[a-záéíóúñü]{4,}\b/g, (word) => {
+      if (["punto", "empate", "triunfo", "victoria", "partidazo", "debut", "mundialista", "candidata", "favorita", "grupo", "rescate", "rescata", "historico", "historica", "dudas", "presion"].includes(word)) {
+        return word;
+      }
+      return "TEAM";
+    })
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
 }
 
 function isHistoricFirstWin(facts, prior) {
@@ -532,7 +576,7 @@ function getFavoriteDescription(profile) {
   return "una selección de mayor jerarquía";
 }
 
-function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore) {
+function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore, context = {}) {
   const matchup = getFavoriteUnderdog(homeProfile, awayProfile);
   if (!matchup) return;
 
@@ -540,14 +584,16 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
   const scoreless = Number(homeScore || 0) + Number(awayScore || 0) === 0;
   const underdogFirstPoint = Number(underdog.prior.points || 0) === 0;
   const favoriteDescription = getFavoriteDescription(favorite);
+  const groupPhrase = context.group ? ` en el Grupo ${context.group}` : "";
 
   if (underdog.debutant && delta >= 60) {
     candidates.push({
       priority: 98,
       source: "editorial-hierarchy",
+      signature: scoreless ? "debutant-historic-scoreless-draw-vs-favorite" : "debutant-historic-scoring-draw-vs-favorite",
       text: scoreless
-        ? `${underdog.name} firma un punto histórico en su debut mundialista: resiste a ${favorite.name}, ${favoriteDescription}, y deja dudas fuertes en la favorita.`
-        : `${underdog.name} convierte su debut mundialista en un golpe de impacto: le saca un empate a ${favorite.name}, ${favoriteDescription}, y suma un punto histórico.`,
+        ? `${underdog.name} firma un punto histórico ante ${favorite.name}; la debutante resiste y deja dudas en ${favoriteDescription}.`
+        : `${underdog.name} le saca un empate a ${favorite.name}: punto histórico para la debutante y aviso para ${favoriteDescription}.`,
     });
     return;
   }
@@ -556,7 +602,8 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
     candidates.push({
       priority: 94,
       source: "editorial-hierarchy",
-      text: `${underdog.name} suma un resultado enorme para su historia mundialista; ${favorite.name} se queda corto ante una debutante que jugó sin complejos.`,
+      signature: "debutant-draw-vs-stronger-team",
+      text: `${underdog.name} suma un resultado enorme en su debut; ${favorite.name} se queda corto ante una selección sin complejos.`,
     });
     return;
   }
@@ -565,15 +612,32 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
     candidates.push({
       priority: 90,
       source: "editorial-hierarchy",
-      text: `${underdog.name} cambia la lectura del grupo con un empate de mucho peso ante ${favorite.name}, un resultado que sabe a aviso para la favorita.`,
+      signature: "underdog-heavy-draw-vs-favorite",
+      text: `${underdog.name} le arranca un empate de mucho peso a ${favorite.name}${groupPhrase}; punto grande para uno, dudas para el favorito.`,
     });
   }
 
   if (underdogFirstPoint) {
+    const variants = [
+      {
+        signature: "first-point-underdog-steals-point-from-favorite",
+        text: `${underdog.name} le roba un punto a ${favorite.name}${groupPhrase}; resultado valioso para sostenerse en la pelea.`,
+      },
+      {
+        signature: "first-point-underdog-favorite-doubts",
+        text: `${underdog.name} suma su primer punto ante ${favorite.name}${groupPhrase}; ${favorite.name} deja preguntas en el camino.`,
+      },
+      {
+        signature: "first-point-underdog-group-alive",
+        text: `${underdog.name} encuentra oxígeno con su primer punto${groupPhrase}; ${favorite.name} deja escapar margen.`,
+      },
+    ];
+    const variant = variants[Math.abs(hashText(`${underdog.name}:${favorite.name}:${context.group || ""}`)) % variants.length];
+
     candidates.push({
       priority: 88,
       source: "editorial-hierarchy",
-      text: `${underdog.name} suma su primer punto del torneo y transforma un partido cuesta arriba en una señal de carácter.`,
+      ...variant,
     });
   }
 }
@@ -704,6 +768,12 @@ function parseGoalMinuteValue(minute) {
 function normalizeMinuteLabel(minute) {
   const text = String(minute).replace(/[’']/g, "").trim();
   return `${text}'`;
+}
+
+function hashText(value) {
+  return String(value || "").split("").reduce((hash, char) => {
+    return (hash * 31 + char.charCodeAt(0)) | 0;
+  }, 0);
 }
 
 function compactEditorialText(text) {

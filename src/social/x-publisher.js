@@ -51,11 +51,11 @@ function validatePostInput({ matchData, imagePath }) {
   }
 }
 
-async function publishFinalScorePost({ matchData, imagePath }) {
+async function publishFinalScorePost({ matchData, imagePath, recentEditorialSignatures } = {}) {
   validatePostInput({ matchData, imagePath });
 
   const mode = getPostMode();
-  const context = getInternalContext(matchData);
+  const context = getInternalContext(matchData, { recentEditorialSignatures });
   const text = buildContextualFinalScoreCaption(matchData, context);
 
   if (mode === "paused") {
@@ -63,6 +63,7 @@ async function publishFinalScorePost({ matchData, imagePath }) {
       published: false,
       mode,
       text,
+      editorialContext: context,
       reason: "X posting is paused.",
     };
   }
@@ -72,6 +73,7 @@ async function publishFinalScorePost({ matchData, imagePath }) {
       published: false,
       mode,
       text,
+      editorialContext: context,
       reason: "Manual mode: post was prepared but not published.",
     };
   }
@@ -100,6 +102,7 @@ async function publishFinalScorePost({ matchData, imagePath }) {
     published: true,
     mode,
     text,
+    editorialContext: context,
     tweetId: tweet.data.id,
     tweetUrl: `https://x.com/i/web/status/${tweet.data.id}`,
   };

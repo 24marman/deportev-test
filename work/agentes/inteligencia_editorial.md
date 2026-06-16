@@ -40,6 +40,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 ## Responsabilidades
 
 - Evitar frases genericas o repetidas.
+- Evitar repetir patrones editoriales recientes aunque cambien los equipos. Si una estructura ya se uso, buscar otro angulo real del partido.
 - Priorizar hitos relevantes: primera victoria mundialista, primer gol mundialista, remontadas, goleadas, invictos, primera victoria del torneo, porteria en cero y stats dominantes.
 - Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
 - Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, batacazo de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
@@ -50,6 +51,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
 - No inventar records ni clasificaciones si la data no los sostiene.
 - Escribir corto: una linea como objetivo, dos maximo si el contexto lo justifica. Evitar frases largas con demasiadas ideas.
+- Nombrar el contexto especifico: rival, favorito, debutante, grupo, momento del gol, consecuencia o duda que deja el resultado. No usar frases comodin tipo "senal de caracter" si no agregan una lectura unica.
 
 ## Criterio editorial de jerarquia
 
