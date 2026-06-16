@@ -91,10 +91,15 @@ El "guru" no es una sola frase generativa; es un sistema de capas:
 
 - Priorizar impacto sobre explicacion.
 - No escribir parrafos.
+- Tono profesional-casual: sonar como cuenta deportiva con criterio y colmillo, no como comunicado institucional.
+- Puede usar burla ligera o ironia fina cuando una favorita falla, se complica o deja dudas, pero nunca insultar, ridiculizar ni sonar infantil.
+- Si no hay un angulo inteligente, preferir texto corto y seco antes que forzar chistes.
 - Usar frases compactas como:
   - `Con gol al 90+3', Canada rescata un empate que mantiene vivo el Grupo B.`
   - `Brasil gana un partidazo de cinco goles y manda un aviso fuerte en su grupo.`
   - `Haiti suma una victoria historica y llega con vida plena a la ultima jornada.`
+  - `Cabo Verde le sacó un empate a España: punto histórico para la debutante y ceja levantada para la candidata.`
+  - `Arabia Saudita le robó un punto a Uruguay; no era el guion, pero cuenta igual.`
 - Si una estadistica confirma la historia, integrarla en pocas palabras: `con 12 remates a puerta`, `tras 30 remates`, `con dominio total`.
 
 ## Formato actual de tweet

@@ -114,7 +114,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 95,
         source: "bsd-tournament-results",
-        text: `${winnerName} consigue su primera victoria de este Mundial y toma aire en la fase de grupos.`,
+        text: `${winnerName} por fin se quita la presión: primera victoria del Mundial y aire puro en el grupo.`,
       });
     }
 
@@ -122,7 +122,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 94,
         source: "curated-world-cup-team-facts",
-        text: `${winnerName} firma una noche histórica: su primera victoria mundialista llega con un ${winnerScore}-${loserScore} ante ${loserName}.`,
+        text: `${winnerName} ya tiene su noche histórica: primera victoria mundialista y nada menos que ante ${loserName}.`,
       });
     }
 
@@ -130,7 +130,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 89,
         source: "curated-world-cup-team-facts",
-        text: `${winnerName} rompe una barrera mundialista: marca por primera vez en el torneo y lo convierte en triunfo.`,
+        text: `${winnerName} rompe la pared: primer gol mundialista y encima convertido en triunfo.`,
       });
     }
 
@@ -138,7 +138,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 80,
         source: "curated-world-cup-team-facts",
-        text: `${winnerName} impone jerarquía de campeón mundial y convierte el resultado en una declaración de autoridad.`,
+        text: `${winnerName} puso la chapa sobre la mesa: triunfo serio y mensaje de campeón.`,
       });
     }
 
@@ -146,7 +146,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 76,
         source: "curated-world-cup-team-facts",
-        text: `${winnerName} recuerda por qué carga historia grande en Mundiales: triunfo sólido y mensaje competitivo.`,
+        text: `${winnerName} recordó que la historia también juega: triunfo sólido y aviso al grupo.`,
       });
     }
 
@@ -154,7 +154,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 88,
         source: "bsd-incidents",
-        text: `${winnerName} transforma el golpe inicial en una remontada de carácter ante ${loserName}.`,
+        text: `${winnerName} empezó golpeado y terminó cobrando: remontada con carácter ante ${loserName}.`,
       });
     }
 
@@ -162,19 +162,19 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 84,
         source: "bsd-scoreline",
-        text: `${winnerName} manda un mensaje fuerte: goleada de ${winnerScore}-${loserScore} y diferencia de peso para la tabla.`,
+        text: `${winnerName} no dejó mucho para debatir: goleada, diferencia y mensaje fuerte para la tabla.`,
       });
     } else if (winnerScore >= 3) {
       candidates.push({
         priority: 78,
         source: "bsd-scoreline",
-        text: `${winnerName} encuentra pegada en el momento justo y sale con tres puntos de alto valor ante ${loserName}.`,
+        text: `${winnerName} encontró pegada cuando hacía falta y salió con tres puntos de oro ante ${loserName}.`,
       });
     } else if (margin === 1) {
       candidates.push({
         priority: 72,
         source: "bsd-scoreline",
-        text: `${winnerName} gana un partido de detalles ante ${loserName} y suma tres puntos que pueden pesar mucho.`,
+        text: `${winnerName} ganó por detalles ante ${loserName}; esos puntos suelen pesar más tarde.`,
       });
     }
 
@@ -182,7 +182,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 70,
         source: "bsd-scoreline",
-        text: `${winnerName} combina eficacia y portería en cero para fortalecer su arranque mundialista.`,
+        text: `${winnerName} hizo el negocio completo: pegó, cerró el arco y se fue con todo.`,
       });
     }
 
@@ -190,7 +190,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 68,
         source: "bsd-tournament-results",
-        text: `${winnerName} mantiene el invicto y refuerza su posición en la pelea del grupo.`,
+        text: `${winnerName} sigue sin caer y empieza a ponerse cómodo en la pelea del grupo.`,
       });
     }
   } else {
@@ -200,19 +200,19 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 82,
         source: "bsd-scoreline",
-        text: `${homeName} y ${awayName} entregan un empate de alto voltaje: goles, respuesta y reparto de puntos.`,
+        text: `${homeName} y ${awayName} se dieron con todo: empate caliente, goles y reparto de puntos.`,
       });
     } else if (totalGoals === 0) {
       candidates.push({
         priority: 72,
         source: "bsd-scoreline",
-        text: `${homeName} y ${awayName} se neutralizan en un empate cerrado que deja todo abierto.`,
+        text: `${homeName} y ${awayName} cerraron la llave: empate sin goles y margen mínimo para todos.`,
       });
     } else {
       candidates.push({
         priority: 70,
         source: "bsd-scoreline",
-        text: `${homeName} y ${awayName} reparten puntos en un duelo que aprieta el margen de error.`,
+        text: `${homeName} y ${awayName} reparten puntos; nadie se cae, pero nadie respira tranquilo.`,
       });
     }
   }
@@ -239,19 +239,19 @@ function buildFactCandidates(matchData) {
     candidates.push({
       priority: 58,
       source: "bsd-schedule",
-      text: `${winnerName} abre su camino mundialista con una victoria que marca tono desde la primera jornada.`,
+      text: `${winnerName} arrancó con el pie correcto: victoria y mensaje desde la primera jornada.`,
     });
   } else if (matchday === 2 && !isDraw) {
     candidates.push({
       priority: 55,
       source: "bsd-schedule",
-      text: `${winnerName} da un paso importante en la segunda jornada y mete presión en su grupo.`,
+      text: `${winnerName} metió presión en la Jornada 2; ahora el grupo se mira diferente.`,
     });
   } else if (matchday === 3 && !isDraw) {
     candidates.push({
       priority: 55,
       source: "bsd-schedule",
-      text: `${winnerName} responde en el cierre de la fase de grupos con una victoria de máximo valor competitivo.`,
+      text: `${winnerName} respondió cuando tocaba: victoria grande para cerrar la fase de grupos.`,
     });
   }
 
@@ -260,8 +260,8 @@ function buildFactCandidates(matchData) {
       priority: 40,
       source: "bsd-schedule",
       text: isDraw
-        ? `${homeName} y ${awayName} dejan el Grupo ${group} más apretado tras el empate.`
-        : `${winnerName} suma tres puntos que mueven la conversación del Grupo ${group}.`,
+        ? `${homeName} y ${awayName} dejan el Grupo ${group} más apretado. Nadie quería ese estrés, pero aquí estamos.`
+        : `${winnerName} suma tres puntos y mueve toda la conversación del Grupo ${group}.`,
     });
   }
 
@@ -269,8 +269,8 @@ function buildFactCandidates(matchData) {
     priority: 10,
     source: "internal-fallback",
     text: isDraw
-      ? `${homeName} y ${awayName} cierran un partido competido con reparto de puntos.`
-      : `${winnerName} supera a ${loserName} y suma una victoria importante en su Mundial.`,
+      ? `${homeName} y ${awayName} reparten puntos en un partido que no regaló demasiado.`
+      : `${winnerName} le gana a ${loserName} y se lleva tres puntos que cuentan mucho.`,
   });
 
   return candidates
@@ -378,7 +378,7 @@ function pushHighScoringMatchCandidate(candidates, context) {
     candidates.push({
       priority: totalGoals >= 6 ? 93 : 91,
       source: "editorial-match-tempo",
-      text: `${homeName} y ${awayName} firman un partidazo${groupPhrase}: goles, respuesta y tensión hasta el final${statsPhrase}.`,
+      text: `${homeName} y ${awayName} firmaron un partidazo${groupPhrase}: golpes, respuestas y tensión hasta el final${statsPhrase}.`,
     });
     return;
   }
@@ -386,7 +386,7 @@ function pushHighScoringMatchCandidate(candidates, context) {
   candidates.push({
     priority: totalGoals >= 6 ? 93 : 91,
     source: "editorial-match-tempo",
-    text: `${winnerName} sale de pie de un partidazo${groupPhrase}: triunfo de alto voltaje y tres puntos enormes${statsPhrase}.`,
+    text: `${winnerName} salió vivo de un partidazo${groupPhrase}: triunfo de alto voltaje y tres puntos enormes${statsPhrase}.`,
   });
 }
 
@@ -421,7 +421,7 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
     candidates.push({
       priority: 96,
       source: "bsd-incidents:late-decisive-goal",
-      text: `${teamName} rescata el empate al ${minute}${groupPhrase}; golpe anímico para ${teamName} y frustración para ${opponentName}.`,
+      text: `${teamName} rescató el empate al ${minute}${groupPhrase}; premio emocional para ${teamName}, golpe durísimo para ${opponentName}.`,
     });
     return;
   }
@@ -429,7 +429,7 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
   candidates.push({
     priority: 96,
     source: "bsd-incidents:late-decisive-goal",
-    text: `${teamName} decide el partido al ${minute}${groupPhrase}: victoria agónica y tres puntos que valen oro.`,
+    text: `${teamName} lo decidió al ${minute}${groupPhrase}: victoria agónica y tres puntos con drama incluido.`,
   });
 }
 
@@ -459,7 +459,7 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 87,
         source: "editorial-group-stakes",
-        text: `${winnerName} queda muy bien perfilado en el Grupo ${group}: seis puntos de seis y la sensación de tener la clasificación encarrilada.`,
+        text: `${winnerName} ya mira el Grupo ${group} desde arriba: seis de seis y medio boleto en el bolsillo.`,
       });
     }
 
@@ -467,7 +467,7 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 86,
         source: "editorial-group-stakes",
-        text: `${loserName} queda contra la pared en el Grupo ${group}: tendrá que ir por una victoria en la última jornada para sostener sus opciones.`,
+        text: `${loserName} se metió en un lío en el Grupo ${group}: ahora toca ganar o empezar a hacer cuentas.`,
       });
     }
   }
@@ -481,13 +481,13 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 86,
         source: "editorial-group-stakes",
-        text: `${pressured} suma, pero no respira: el empate deja el Grupo ${group} abierto y obliga a mirar la última jornada con presión real.`,
+        text: `${pressured} suma, pero no respira: el Grupo ${group} sigue abierto y la última jornada viene pesada.`,
       });
     } else {
       candidates.push({
         priority: 82,
         source: "editorial-group-stakes",
-        text: `${homeName} y ${awayName} dejan el Grupo ${group} al rojo vivo: el punto sirve, pero todavía no despeja el camino a la siguiente fase.`,
+        text: `${homeName} y ${awayName} dejan el Grupo ${group} al rojo vivo; el punto sirve, pero no calma a nadie.`,
       });
     }
   }
@@ -500,7 +500,7 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 90,
         source: "editorial-group-stakes",
-        text: `${winnerName} responde en el cierre del Grupo ${group} y deja prácticamente encaminado su boleto a la siguiente fase.`,
+        text: `${winnerName} hizo la tarea en el cierre del Grupo ${group} y dejó el boleto casi servido.`,
       });
     }
 
@@ -508,7 +508,7 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 88,
         source: "editorial-group-stakes",
-        text: `${loserName} se complica en el cierre del Grupo ${group}: la derrota lo deja pendiente de combinaciones y sin margen propio.`,
+        text: `${loserName} se complicó solo en el cierre del Grupo ${group}: ahora depende más de la calculadora que de sí mismo.`,
       });
     }
 
@@ -516,7 +516,7 @@ function pushGroupStakesCandidates(candidates, context) {
       candidates.push({
         priority: 84,
         source: "editorial-group-stakes",
-        text: `${homeName} y ${awayName} cierran el Grupo ${group} con un empate que puede valer oro o quedarse corto según las combinaciones.`,
+        text: `${homeName} y ${awayName} cierran el Grupo ${group} con un empate de calculadora en mano.`,
       });
     }
   }
@@ -592,8 +592,8 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
       source: "editorial-hierarchy",
       signature: scoreless ? "debutant-historic-scoreless-draw-vs-favorite" : "debutant-historic-scoring-draw-vs-favorite",
       text: scoreless
-        ? `${underdog.name} firma un punto histórico ante ${favorite.name}; la debutante resiste y deja dudas en ${favoriteDescription}.`
-        : `${underdog.name} le saca un empate a ${favorite.name}: punto histórico para la debutante y aviso para ${favoriteDescription}.`,
+        ? `${underdog.name} le cerró la puerta a ${favorite.name}: punto histórico para la debutante y dudas para ${favoriteDescription}.`
+        : `${underdog.name} le sacó un empate a ${favorite.name}: punto histórico para la debutante y aviso para ${favoriteDescription}.`,
     });
     return;
   }
@@ -603,7 +603,7 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
       priority: 94,
       source: "editorial-hierarchy",
       signature: "debutant-draw-vs-stronger-team",
-      text: `${underdog.name} suma un resultado enorme en su debut; ${favorite.name} se queda corto ante una selección sin complejos.`,
+      text: `${underdog.name} debutó sin pedir permiso; ${favorite.name} se quedó corto ante una selección sin complejos.`,
     });
     return;
   }
@@ -613,7 +613,7 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
       priority: 90,
       source: "editorial-hierarchy",
       signature: "underdog-heavy-draw-vs-favorite",
-      text: `${underdog.name} le arranca un empate de mucho peso a ${favorite.name}${groupPhrase}; punto grande para uno, dudas para el favorito.`,
+      text: `${underdog.name} le arrancó un empate pesado a ${favorite.name}${groupPhrase}; punto grande para ${underdog.name}, ceja levantada para el favorito.`,
     });
   }
 
@@ -621,15 +621,15 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
     const variants = [
       {
         signature: "first-point-underdog-steals-point-from-favorite",
-        text: `${underdog.name} le roba un punto a ${favorite.name}${groupPhrase}; resultado valioso para sostenerse en la pelea.`,
+        text: `${underdog.name} le robó un punto a ${favorite.name}${groupPhrase}; no era el guion, pero cuenta igual.`,
       },
       {
         signature: "first-point-underdog-favorite-doubts",
-        text: `${underdog.name} suma su primer punto ante ${favorite.name}${groupPhrase}; ${favorite.name} deja preguntas en el camino.`,
+        text: `${underdog.name} suma su primer punto ante ${favorite.name}${groupPhrase}; ${favorite.name} sale con más preguntas que respuestas.`,
       },
       {
         signature: "first-point-underdog-group-alive",
-        text: `${underdog.name} encuentra oxígeno con su primer punto${groupPhrase}; ${favorite.name} deja escapar margen.`,
+        text: `${underdog.name} encontró oxígeno con su primer punto${groupPhrase}; ${favorite.name} dejó escapar margen.`,
       },
     ];
     const variant = variants[Math.abs(hashText(`${underdog.name}:${favorite.name}:${context.group || ""}`)) % variants.length];
@@ -652,7 +652,7 @@ function pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerS
     candidates.push({
       priority: 99,
       source: "editorial-hierarchy",
-      text: `${winnerProfile.name} escribe una página histórica: vence ${winnerScore}-${loserScore} a ${loserProfile.name}, ${favoriteDescription}, en una de las primeras grandes sorpresas del torneo.`,
+      text: `${winnerProfile.name} rompió el guion: le ganó ${winnerScore}-${loserScore} a ${loserProfile.name}, ${favoriteDescription}, y firmó batacazo.`,
     });
     return;
   }
@@ -660,7 +660,7 @@ function pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerS
   candidates.push({
     priority: 93,
     source: "editorial-hierarchy",
-    text: `${winnerProfile.name} sacude el grupo con un triunfo de alta carga simbólica ante ${loserProfile.name}, una victoria que cambia expectativas y conversación.`,
+    text: `${winnerProfile.name} sacudió el grupo ante ${loserProfile.name}; de esos triunfos que cambian la conversación.`,
   });
 }
 
@@ -670,7 +670,7 @@ function pushFirstGoalCandidate(candidates, teamName, score, facts, prior) {
   candidates.push({
     priority: 87,
     source: "curated-world-cup-team-facts",
-    text: `${teamName} ya tiene su primer gol en la historia mundialista, una postal que queda por encima del marcador.`,
+    text: `${teamName} ya gritó su primer gol mundialista; ese momento vive aparte del marcador.`,
   });
 }
 
