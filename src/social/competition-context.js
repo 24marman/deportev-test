@@ -82,6 +82,17 @@ function getEventKey(event) {
   return scheduled ? `${scheduled.date}:${scheduled.group}:${home}:${away}` : String(event.id || `${home}:${away}`);
 }
 
+function scheduledMatchKey(match) {
+  const home = normalizeTeamKey(match.home);
+  const away = normalizeTeamKey(match.away);
+  return `${match.date}:${match.group}:${home}:${away}`;
+}
+
+function eventScheduleKey(event) {
+  const scheduled = findScheduledGroupStageMatch(event);
+  return scheduled ? scheduledMatchKey(scheduled) : null;
+}
+
 function mergeCurrentEvent(events, currentEvent) {
   const merged = new Map();
 
@@ -195,15 +206,25 @@ function buildPriorGroupContext(matchData, events = []) {
   const group = matchData.competition?.groupLetter;
   const eventId = String(matchData.source?.eventId || "");
   const eventTime = getEventTime({ event_date: matchData.source?.eventDate });
+  const currentEvent = getCurrentEvent(matchData);
+  const currentScheduleKey = eventScheduleKey(currentEvent);
   const homeKey = normalizeTeamKey(matchData.teams?.home?.providerName || matchData.teams?.home?.name);
   const awayKey = normalizeTeamKey(matchData.teams?.away?.providerName || matchData.teams?.away?.name);
   const table = new Map();
+  const groupSchedule = GROUP_STAGE_SCHEDULE.filter((match) => match.group === group);
+  const groupTeams = getGroupTeams(groupSchedule);
+  const playedScheduleKeys = new Set(currentScheduleKey ? [currentScheduleKey] : []);
+
+  for (const team of groupTeams) {
+    table.set(team, emptyStanding());
+  }
 
   for (const event of events) {
     if (!event?.id || String(event.id) === eventId || !isFinished(event.status)) continue;
 
     const scheduled = findScheduledGroupStageMatch(event);
     if (!scheduled || scheduled.group !== group) continue;
+    playedScheduleKeys.add(scheduledMatchKey(scheduled));
 
     const finishedAt = getEventTime(event);
     if (eventTime && finishedAt && finishedAt >= eventTime) continue;
@@ -236,6 +257,101 @@ function buildPriorGroupContext(matchData, events = []) {
     awayAfter: afterTable.get(awayKey) || emptyStanding(),
     tableBefore: priorTable,
     tableAfter: getSortedTableRows(afterTable),
+    groupOutlook: buildGroupOutlook({
+      afterTable,
+      groupSchedule,
+      groupTeams,
+      currentScheduleKey,
+      playedScheduleKeys,
+      homeKey,
+      awayKey,
+    }),
+  };
+}
+
+function getGroupTeams(groupSchedule) {
+  const teams = new Set();
+
+  for (const match of groupSchedule) {
+    teams.add(normalizeTeamKey(match.home));
+    teams.add(normalizeTeamKey(match.away));
+  }
+
+  return Array.from(teams);
+}
+
+function getRemainingMatchesForTeam(groupSchedule, playedScheduleKeys, team) {
+  return groupSchedule.filter((match) => {
+    if (playedScheduleKeys.has(scheduledMatchKey(match))) return false;
+
+    const home = normalizeTeamKey(match.home);
+    const away = normalizeTeamKey(match.away);
+    return home === team || away === team;
+  });
+}
+
+function getTeamRank(tableRows, team) {
+  const index = tableRows.findIndex((row) => row.team === team);
+  return index >= 0 ? index + 1 : null;
+}
+
+function buildGroupOutlook({ afterTable, groupSchedule, groupTeams, currentScheduleKey, playedScheduleKeys, homeKey, awayKey }) {
+  if (!groupSchedule.length || !groupTeams.length) {
+    return null;
+  }
+
+  const tableRows = getSortedTableRows(afterTable);
+  const byTeam = {};
+
+  for (const team of groupTeams) {
+    const row = cloneStanding(afterTable.get(team) || emptyStanding());
+    const remainingMatches = getRemainingMatchesForTeam(groupSchedule, playedScheduleKeys, team);
+
+    byTeam[team] = {
+      ...row,
+      rank: getTeamRank(tableRows, team),
+      remainingGames: remainingMatches.length,
+      maxPoints: row.points + remainingMatches.length * 3,
+    };
+  }
+
+  const secondPlacePoints = Number(tableRows[1]?.points || 0);
+  const currentIndex = groupSchedule.findIndex((match) => scheduledMatchKey(match) === currentScheduleKey);
+  const currentMatch = currentIndex >= 0 ? groupSchedule[currentIndex] : null;
+  const remainingSameMatchdayMatches =
+    currentMatch
+      ? groupSchedule.filter(
+          (match) => String(match.matchday) === String(currentMatch.matchday) && !playedScheduleKeys.has(scheduledMatchKey(match)),
+        )
+      : [];
+
+  for (const team of groupTeams) {
+    const outlook = byTeam[team];
+    const others = groupTeams.filter((other) => other !== team).map((other) => byTeam[other]);
+    const teamsAbleToTieOrPass = others.filter((other) => other.maxPoints >= outlook.points).length;
+
+    outlook.guaranteedFirst = outlook.remainingGames >= 0 && others.every((other) => other.maxPoints < outlook.points);
+    outlook.guaranteedTopTwo = teamsAbleToTieOrPass <= 1;
+    outlook.oneStepFromTopTwo =
+      !outlook.guaranteedTopTwo && outlook.remainingGames > 0 && outlook.played >= 2 && outlook.points >= 6;
+    outlook.noLongerControlsTopTwo =
+      outlook.remainingGames > 0 && outlook.rank > 2 && outlook.maxPoints <= secondPlacePoints;
+    outlook.eliminatedTopTwo = outlook.remainingGames === 0 && outlook.rank > 2;
+  }
+
+  const aliveForTopTwo = groupTeams.filter((team) => byTeam[team].maxPoints >= secondPlacePoints).length;
+  const spread = Number(tableRows[0]?.points || 0) - Number(tableRows[tableRows.length - 1]?.points || 0);
+
+  return {
+    tableAfter: tableRows,
+    teams: byTeam,
+    home: byTeam[homeKey] || null,
+    away: byTeam[awayKey] || null,
+    openForFinalDay:
+      String(currentMatch?.matchday || "") === "2" &&
+      remainingSameMatchdayMatches.length === 0 &&
+      aliveForTopTwo >= 3 &&
+      spread <= 4,
   };
 }
 

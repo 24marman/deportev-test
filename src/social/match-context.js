@@ -247,6 +247,7 @@ function buildFactCandidates(matchData) {
     awayAfter,
     winnerAfter,
     loserAfter,
+    groupOutlook: prior.groupOutlook,
   });
 
   if (matchday === 1 && !isDraw) {
@@ -563,9 +564,40 @@ function pushGroupStakesCandidates(candidates, context) {
     awayAfter,
     winnerAfter,
     loserAfter,
+    groupOutlook,
   } = context;
 
   if (!group || matchday < 2) return;
+
+  const homeOutlook = groupOutlook?.home || null;
+  const awayOutlook = groupOutlook?.away || null;
+  const winnerOutlook = winnerName === homeName ? homeOutlook : awayOutlook;
+  const loserOutlook = winnerName === homeName ? awayOutlook : homeOutlook;
+
+  if (!isDraw) {
+    pushWinnerClassificationCandidates(candidates, {
+      winnerName,
+      loserName,
+      group,
+      winnerOutlook,
+    });
+
+    pushLoserClassificationRiskCandidates(candidates, {
+      winnerName,
+      loserName,
+      loserOutlook,
+    });
+  } else {
+    pushDrawGroupOutlookCandidates(candidates, {
+      homeName,
+      awayName,
+      group,
+      matchday,
+      groupOutlook,
+      homeOutlook,
+      awayOutlook,
+    });
+  }
 
   if (!isDraw && matchday === 2) {
     if (Number(winnerAfter.points || 0) >= 6) {
@@ -632,6 +664,88 @@ function pushGroupStakesCandidates(candidates, context) {
         text: `${homeName} y ${awayName} cerraron el Grupo ${group} con un empate que deja todo sujeto a combinaciones.`,
       });
     }
+  }
+}
+
+function pushWinnerClassificationCandidates(candidates, context) {
+  const { winnerName, loserName, group, winnerOutlook } = context;
+  if (!winnerOutlook) return;
+
+  if (winnerOutlook.guaranteedFirst) {
+    candidates.push({
+      priority: 100,
+      source: "editorial-group-qualification",
+      text: `${winnerName} venció a ${loserName} y asegura el primer lugar del Grupo ${group}.`,
+    });
+    return;
+  }
+
+  if (winnerOutlook.guaranteedTopTwo) {
+    candidates.push({
+      priority: 99,
+      source: "editorial-group-qualification",
+      text: `${winnerName} venció a ${loserName} y asegura matemáticamente su clasificación a la siguiente fase.`,
+    });
+    return;
+  }
+
+  if (winnerOutlook.oneStepFromTopTwo) {
+    candidates.push({
+      priority: 92,
+      source: "editorial-group-qualification",
+      text: `${winnerName} derrotó a ${loserName} y queda a un paso de avanzar en el Grupo ${group}.`,
+    });
+  }
+}
+
+function pushLoserClassificationRiskCandidates(candidates, context) {
+  const { winnerName, loserName, loserOutlook } = context;
+  if (!loserOutlook) return;
+
+  if (loserOutlook.eliminatedTopTwo) {
+    candidates.push({
+      priority: 98,
+      source: "editorial-group-qualification",
+      text: `${loserName} cayó ante ${winnerName} y queda fuera de la pelea directa por avanzar.`,
+    });
+    return;
+  }
+
+  if (loserOutlook.noLongerControlsTopTwo) {
+    candidates.push({
+      priority: 97,
+      source: "editorial-group-qualification",
+      text: `${loserName} cayó ante ${winnerName} y ya no depende de sí mismo para avanzar.`,
+    });
+  }
+}
+
+function pushDrawGroupOutlookCandidates(candidates, context) {
+  const { homeName, awayName, group, matchday, groupOutlook, homeOutlook, awayOutlook } = context;
+  if (!groupOutlook) return;
+
+  if (matchday === 2 && groupOutlook.openForFinalDay) {
+    candidates.push({
+      priority: 93,
+      source: "editorial-group-qualification",
+      text: `${homeName} y ${awayName} empataron y dejan el Grupo ${group} completamente abierto para la última jornada.`,
+    });
+    return;
+  }
+
+  const homeKeepsOptions = homeOutlook && homeOutlook.remainingGames > 0 && !homeOutlook.noLongerControlsTopTwo;
+  const awayKeepsOptions = awayOutlook && awayOutlook.remainingGames > 0 && !awayOutlook.noLongerControlsTopTwo;
+
+  if (matchday >= 2 && (homeKeepsOptions || awayKeepsOptions)) {
+    const teamName = homeKeepsOptions && !awayKeepsOptions ? homeName : awayKeepsOptions && !homeKeepsOptions ? awayName : null;
+
+    candidates.push({
+      priority: 88,
+      source: "editorial-group-qualification",
+      text: teamName
+        ? `${teamName} sumó un punto y mantiene opciones de avanzar en el Grupo ${group}.`
+        : `${homeName} y ${awayName} empataron y mantienen opciones de avanzar en el Grupo ${group}.`,
+    });
   }
 }
 

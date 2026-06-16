@@ -51,6 +51,9 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Detectar partidos destacados por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
 - Detectar goles decisivos en los ultimos minutos: empate rescatado, triunfo agonico, remontada o gol que cambia por completo el cierre emocional del partido.
 - Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos abiertos y cierres sujetos a combinaciones.
+- Priorizar consecuencias de clasificacion cuando sean el dato mas importante: clasificacion matematica, primer lugar asegurado, quedar a un paso de avanzar, perder control del pase o dejar el grupo abierto para la ultima jornada.
+- No crear una seccion aparte de clasificacion. Si la tabla importa, debe integrarse dentro de la misma frase corta del tweet.
+- No mencionar siempre la tabla. Si no hay consecuencia relevante, centrarse en el resultado, el contexto deportivo, goles decisivos, jerarquia o estadisticas.
 - Leer la forma reciente de cada seleccion: segunda derrota consecutiva, segunda victoria consecutiva, segundo empate seguido o rachas mayores, solo cuando la data del grupo lo confirme.
 - Leer el contexto completo del dia: si varios partidos terminan empatados o todos los partidos del dia fueron empate, usarlo como angulo editorial cuando sea mas relevante que una frase generica.
 - Integrar el grupo o jornada solo si aporta contexto natural.
