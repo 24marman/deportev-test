@@ -186,7 +186,7 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 80,
         source: "curated-world-cup-team-facts",
-        text: `${winnerName} impuso su jerarquía y suma una victoria importante para afirmarse en el grupo.`,
+        text: `${winnerName} impuso su jerarquía y firma una victoria importante para afirmarse en el grupo.`,
       });
     }
 
@@ -216,13 +216,13 @@ function buildFactCandidates(matchData) {
       candidates.push({
         priority: 78,
         source: "bsd-scoreline",
-        text: `${winnerName} aprovechó mejor sus oportunidades y suma tres puntos ante ${loserName}.`,
+        text: `${winnerName} aprovechó mejor sus oportunidades y resolvió un partido exigente ante ${loserName}.`,
       });
     } else if (margin === 1) {
       candidates.push({
         priority: 72,
         source: "bsd-scoreline",
-        text: `${winnerName} superó por margen mínimo a ${loserName} y suma tres puntos que pueden pesar en el grupo.`,
+        text: `${winnerName} superó por margen mínimo a ${loserName} y gana margen en la pelea del grupo.`,
       });
     }
 
@@ -297,7 +297,7 @@ function buildFactCandidates(matchData) {
     candidates.push({
       priority: 58,
       source: "bsd-schedule",
-      text: `${winnerName} inició su Mundial con una victoria y suma tres puntos desde la primera jornada.`,
+      text: `${winnerName} inició su Mundial con victoria y evita presión temprana en el grupo.`,
     });
   } else if (matchday === 2 && !isDraw) {
     candidates.push({
@@ -319,7 +319,7 @@ function buildFactCandidates(matchData) {
       source: "bsd-schedule",
       text: isDraw
         ? `${homeName} y ${awayName} empataron y dejan más apretado el Grupo ${group}.`
-        : `${winnerName} sumó tres puntos y mejora su posición en el Grupo ${group}.`,
+        : `${winnerName} ganó y mejora su posición en el Grupo ${group}.`,
     });
   }
 
@@ -328,7 +328,7 @@ function buildFactCandidates(matchData) {
     source: "internal-fallback",
     text: isDraw
       ? `${homeName} y ${awayName} repartieron puntos en un partido cerrado.`
-      : `${winnerName} venció a ${loserName} y suma tres puntos en el grupo.`,
+      : `${winnerName} venció a ${loserName} y toma impulso en el grupo.`,
   });
 
   return candidates
@@ -429,14 +429,13 @@ function pushHighScoringMatchCandidate(candidates, context) {
 
   if (!dramaticScoreline) return;
 
-  const statsPhrase = getOpenGameStatsPhrase(statSummary);
   const groupPhrase = group ? ` en el Grupo ${group}` : "";
 
   if (isDraw) {
     candidates.push({
       priority: totalGoals >= 6 ? 93 : 91,
       source: "editorial-match-tempo",
-      text: `${homeName} y ${awayName} empataron en un partido de alto ritmo${groupPhrase} y mantienen abierta la pelea${statsPhrase}.`,
+      text: `${homeName} y ${awayName} firmaron un empate de alto ritmo${groupPhrase}.`,
     });
     return;
   }
@@ -444,26 +443,8 @@ function pushHighScoringMatchCandidate(candidates, context) {
   candidates.push({
     priority: totalGoals >= 6 ? 93 : 91,
     source: "editorial-match-tempo",
-    text: `${winnerName} venció a ${loserName} en un partido de ${totalGoals} goles${groupPhrase} y suma tres puntos para la tabla${statsPhrase}.`,
+    text: `${winnerName} venció a ${loserName} en un partido abierto de ${formatSmallNumber(totalGoals)} goles${groupPhrase}.`,
   });
-}
-
-function getOpenGameStatsPhrase(statSummary) {
-  if (!statSummary) return "";
-
-  if (statSummary.totalShots >= 28 && statSummary.totalShotsOnTarget >= 9) {
-    return `, con ${statSummary.totalShots} remates y ${statSummary.totalShotsOnTarget} a puerta`;
-  }
-
-  if (statSummary.totalXg >= 3.5) {
-    return `, con ${formatStatNumber(statSummary.totalXg)} xG combinados`;
-  }
-
-  if (statSummary.totalShots >= 24) {
-    return `, con ${statSummary.totalShots} remates`;
-  }
-
-  return "";
 }
 
 function pushDecisiveLateGoalCandidate(candidates, context) {
@@ -487,7 +468,7 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
   candidates.push({
     priority: 96,
     source: "bsd-incidents:late-decisive-goal",
-    text: `${teamName} decidió el partido en el ${minute}${groupPhrase} y suma tres puntos en el cierre.`,
+    text: `${teamName} decidió el partido en el ${minute}${groupPhrase} y cambia el cierre con un golpe clave.`,
   });
 }
 
@@ -688,21 +669,20 @@ function oppositeSide(side) {
 
 function getFavoriteDominancePhrase(dominance) {
   const side = dominance.side;
-  const parts = [];
 
-  if (dominance.shots?.[side] >= 20) {
-    parts.push(`${formatStatNumber(dominance.shots[side])} remates`);
+  if (dominance.xg?.[side] >= 1.8 && dominance.shots?.[side] >= 18) {
+    return " el volumen ofensivo";
   }
 
   if (dominance.xg?.[side] >= 1.8) {
-    parts.push(`${formatXgNumber(dominance.xg[side])} xG`);
+    return " las ocasiones más claras";
   }
 
-  if (!parts.length && dominance.possession?.[side] >= 65) {
-    parts.push(`${formatStatNumber(dominance.possession[side])}% de posesión`);
+  if (dominance.possession?.[side] >= 65) {
+    return " la posesión";
   }
 
-  return parts.length ? ` con ${parts.slice(0, 2).join(" y ")}` : " las estadísticas";
+  return " el peso del partido";
 }
 
 function pushMatchIntelligenceCandidates(candidates, context) {
@@ -736,7 +716,7 @@ function pushMatchIntelligenceCandidates(candidates, context) {
       : `${winnerName} venció a ${loserName} en un partido cerrado, con pocas llegadas claras.`;
 
     candidates.push({
-      priority: isDraw ? 81 : 74,
+      priority: isDraw ? 96 : 74,
       source: "bsd-advanced-stats:low-tempo",
       signature: isDraw ? "low-tempo-draw" : "low-tempo-narrow-win",
       text,
@@ -768,11 +748,19 @@ function pushMatchIntelligenceCandidates(candidates, context) {
   }
 
   if (!isDraw && chanceLeader?.strong && chanceLeader.side === winnerSide) {
+    const winnerScore = Math.max(homeScore, awayScore);
+    const loserScore = Math.min(homeScore, awayScore);
+    const margin = winnerScore - loserScore;
+    const text =
+      margin === 1
+        ? `${winnerName} generó las mejores ocasiones y encontró premio en un partido cerrado${groupPhrase}.`
+        : `${winnerName} respaldó su superioridad con una victoria sólida${groupPhrase}.`;
+
     candidates.push({
       priority: 90,
       source: "bsd-advanced-stats:chance-quality",
       signature: "winner-creates-clearer-chances",
-      text: `${winnerName} fue superior y convierte su dominio en tres puntos importantes${groupPhrase}.`,
+      text,
     });
   }
 
@@ -1164,6 +1152,22 @@ function formatXgNumber(value) {
   return Number(value || 0).toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
 }
 
+function formatSmallNumber(value) {
+  const words = {
+    0: "cero",
+    1: "un",
+    2: "dos",
+    3: "tres",
+    4: "cuatro",
+    5: "cinco",
+    6: "seis",
+    7: "siete",
+    8: "ocho",
+    9: "nueve",
+  };
+  return words[Number(value)] || String(value);
+}
+
 function pushGroupStakesCandidates(candidates, context) {
   const {
     homeName,
@@ -1500,7 +1504,7 @@ function pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerS
   candidates.push({
     priority: 93,
     source: "editorial-hierarchy",
-    text: `${winnerProfile.name} venció a ${loserProfile.name} y cambia la lectura del grupo con tres puntos valiosos.`,
+    text: `${winnerProfile.name} venció a ${loserProfile.name} y cambia la lectura del grupo con una victoria de peso.`,
   });
 }
 
@@ -1517,7 +1521,7 @@ function pushDefendingChampionDebutCandidate(candidates, context) {
       priority: 98,
       source: "curated-world-cup-team-facts:defending-champion",
       signature: "defending-champion-opens-solid-win",
-      text: `El campeón vigente debuta con una victoria sólida ante ${loserName} y suma sus primeros tres puntos.`,
+      text: `El campeón vigente debuta con una victoria sólida ante ${loserName} y marca el tono desde el arranque.`,
     });
     return;
   }
@@ -1526,7 +1530,7 @@ function pushDefendingChampionDebutCandidate(candidates, context) {
     priority: cleanSheet ? 96 : 94,
     source: "curated-world-cup-team-facts:defending-champion",
     signature: "defending-champion-opens-with-win",
-    text: `El campeón vigente debuta con victoria ante ${loserName} y suma sus primeros tres puntos.`,
+    text: `El campeón vigente debuta con victoria ante ${loserName} y arranca sin sobresaltos.`,
   });
 }
 
@@ -1691,7 +1695,6 @@ function compactEditorialText(text) {
 
   const shortened = first
     .replace(/, una victoria que cambia expectativas y conversación/g, "")
-    .replace(/ y tres puntos que pesan más por la forma/g, "")
     .replace(/ para sostener sus opciones/g, "")
     .replace(/ con presión real/g, "")
     .replace(/ y deja dudas fuertes en la favorita/g, "")
