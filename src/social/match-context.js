@@ -727,7 +727,21 @@ function pushMatchIntelligenceCandidates(candidates, context) {
   const loserName = winnerSide === "home" ? awayName : homeName;
   const chanceLeader = matchIntelligence.chanceLeader;
   const latePressure = matchIntelligence.latePressureLeader;
+  const lowTempo = matchIntelligence.lowTempo;
   const groupPhrase = group ? ` en el Grupo ${group}` : "";
+
+  if (lowTempo?.strong && totalGoals <= 1) {
+    const text = isDraw
+      ? `${homeName} y ${awayName} empataron en un partido de pocas llegadas y poco margen ofensivo.`
+      : `${winnerName} venció a ${loserName} en un partido cerrado, con pocas llegadas claras.`;
+
+    candidates.push({
+      priority: isDraw ? 81 : 74,
+      source: "bsd-advanced-stats:low-tempo",
+      signature: isDraw ? "low-tempo-draw" : "low-tempo-narrow-win",
+      text,
+    });
+  }
 
   if (isDraw && chanceLeader?.strong) {
     const dominantName = chanceLeader.side === "home" ? homeName : awayName;
@@ -833,7 +847,40 @@ function analyzeMatchIntelligence(rawStats) {
     shotSummary,
     chanceLeader: getChanceLeader({ statSummary, bigChancePair, shotSummary, xgTimeline }),
     latePressureLeader: getLatePressureLeader({ shotSummary, xgTimeline, momentumTimeline }),
+    lowTempo: getLowEventTempo({ statSummary, bigChancePair, shotSummary }),
   };
+}
+
+function getLowEventTempo({ statSummary, bigChancePair, shotSummary }) {
+  const totalShots = Number(statSummary?.totalShots || 0) || sumShotSummary(shotSummary, "shots");
+  const totalShotsOnTarget =
+    Number(statSummary?.totalShotsOnTarget || 0) || sumShotSummary(shotSummary, "shotsOnTarget");
+  const totalXg = Number(statSummary?.totalXg || 0) || sumShotSummary(shotSummary, "xg");
+  const totalBigChances = sumPair(bigChancePair) || sumShotSummary(shotSummary, "clearChances");
+
+  const hasAnySignal = [totalShots, totalShotsOnTarget, totalXg, totalBigChances].some((value) => Number(value || 0) > 0);
+  if (!hasAnySignal) return null;
+
+  const strong =
+    totalShots <= 16 &&
+    totalShotsOnTarget <= 4 &&
+    totalXg <= 1.4 &&
+    totalBigChances <= 1;
+
+  if (!strong) return null;
+
+  return {
+    strong,
+    totalShots,
+    totalShotsOnTarget,
+    totalXg,
+    totalBigChances,
+  };
+}
+
+function sumShotSummary(shotSummary, key) {
+  if (!shotSummary) return 0;
+  return Number(shotSummary.home?.[key] || 0) + Number(shotSummary.away?.[key] || 0);
 }
 
 function getChanceLeader({ statSummary, bigChancePair, shotSummary, xgTimeline }) {
