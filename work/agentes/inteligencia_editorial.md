@@ -48,6 +48,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Evitar repetir patrones editoriales recientes aunque cambien los equipos. Si una estructura ya se uso, buscar otro angulo real del partido.
 - Priorizar hitos relevantes: primera victoria mundialista, primer gol mundialista, remontadas, goleadas, invictos, primera victoria del torneo, porteria en cero y stats dominantes.
 - Leer la jerarquia futbolistica del partido antes de elegir la frase: candidato al titulo, potencia historica, semifinalista reciente, debutante, seleccion de menor recorrido mundialista.
+- Detectar al campeon vigente de la Copa del Mundo. En su debut, si gana, puede ser el angulo principal: `El campeon vigente debuta con victoria...`. Si empata o pierde, leerlo como puntos dejados o dudas desde el arranque.
 - Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, sorpresa de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
 - Detectar partidos destacados por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
 - Detectar goles decisivos en los ultimos minutos: empate rescatado, triunfo agonico, remontada o gol que cambia por completo el cierre emocional del partido.

@@ -1,6 +1,6 @@
 {
   "algeria": { "firstWorldCupAppearance": 1982, "bestFinish": "round_of_16", "worldCupTitlesBefore2026": 0 },
-  "argentina": { "firstWorldCupAppearance": 1930, "bestFinish": "champion", "worldCupTitlesBefore2026": 3 },
+  "argentina": { "firstWorldCupAppearance": 1930, "bestFinish": "champion", "worldCupTitlesBefore2026": 3, "defendingChampion": true, "lastWorldCupTitle": 2022 },
   "australia": { "firstWorldCupAppearance": 1974, "bestFinish": "round_of_16", "worldCupTitlesBefore2026": 0 },
   "austria": { "firstWorldCupAppearance": 1934, "bestFinish": "third_place", "worldCupTitlesBefore2026": 0 },
   "belgium": { "firstWorldCupAppearance": 1930, "bestFinish": "third_place", "worldCupTitlesBefore2026": 0 },

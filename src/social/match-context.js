@@ -145,6 +145,15 @@ function buildFactCandidates(matchData) {
 
   if (!isDraw) {
     pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerScore, loserScore);
+    pushDefendingChampionDebutCandidate(candidates, {
+      winnerName,
+      loserName,
+      winnerFacts,
+      winnerPrior,
+      winnerScore,
+      loserScore,
+      matchday,
+    });
 
     if (Number(winnerPrior.played || 0) > 0 && Number(winnerPrior.wins || 0) === 0) {
       candidates.push({
@@ -231,6 +240,15 @@ function buildFactCandidates(matchData) {
     }
   } else {
     pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeScore, awayScore, { group, matchday });
+    pushDefendingChampionDrawCandidate(candidates, {
+      homeName,
+      awayName,
+      homeFacts,
+      awayFacts,
+      homePrior,
+      awayPrior,
+      matchday,
+    });
 
     if (totalGoals >= 4) {
       candidates.push({
@@ -1395,6 +1413,52 @@ function pushUpsetWinCandidates(candidates, winnerProfile, loserProfile, winnerS
     priority: 93,
     source: "editorial-hierarchy",
     text: `${winnerProfile.name} venció a ${loserProfile.name} y cambia la lectura del grupo con tres puntos valiosos.`,
+  });
+}
+
+function pushDefendingChampionDebutCandidate(candidates, context) {
+  const { winnerName, loserName, winnerFacts, winnerPrior, winnerScore, loserScore, matchday } = context;
+  if (!winnerFacts?.defendingChampion) return;
+  if (Number(matchday || 0) !== 1 || Number(winnerPrior.played || 0) > 0) return;
+
+  const cleanSheet = Number(loserScore || 0) === 0;
+  const margin = Number(winnerScore || 0) - Number(loserScore || 0);
+
+  if (margin >= 2) {
+    candidates.push({
+      priority: 98,
+      source: "curated-world-cup-team-facts:defending-champion",
+      signature: "defending-champion-opens-solid-win",
+      text: `El campeón vigente debuta con una victoria sólida ante ${loserName} y suma sus primeros tres puntos.`,
+    });
+    return;
+  }
+
+  candidates.push({
+    priority: cleanSheet ? 96 : 94,
+    source: "curated-world-cup-team-facts:defending-champion",
+    signature: "defending-champion-opens-with-win",
+    text: `El campeón vigente debuta con victoria ante ${loserName} y suma sus primeros tres puntos.`,
+  });
+}
+
+function pushDefendingChampionDrawCandidate(candidates, context) {
+  const { homeName, awayName, homeFacts, awayFacts, homePrior, awayPrior, matchday } = context;
+  if (Number(matchday || 0) !== 1) return;
+
+  const championSide = homeFacts?.defendingChampion
+    ? { name: homeName, opponent: awayName, prior: homePrior }
+    : awayFacts?.defendingChampion
+      ? { name: awayName, opponent: homeName, prior: awayPrior }
+      : null;
+
+  if (!championSide || Number(championSide.prior?.played || 0) > 0) return;
+
+  candidates.push({
+    priority: 97,
+    source: "curated-world-cup-team-facts:defending-champion",
+    signature: "defending-champion-opens-with-draw",
+    text: `El campeón vigente debuta con empate ante ${championSide.opponent} y deja puntos en el camino desde el arranque.`,
   });
 }
 
