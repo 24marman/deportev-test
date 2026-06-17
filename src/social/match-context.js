@@ -423,7 +423,7 @@ function projectStanding(prior, goalsFor, goalsAgainst) {
 }
 
 function pushHighScoringMatchCandidate(candidates, context) {
-  const { homeName, awayName, homeScore, awayScore, totalGoals, isDraw, winnerName, loserName, group, statSummary } = context;
+  const { homeName, awayName, homeScore, awayScore, totalGoals, isDraw, winnerName, loserName, group } = context;
   const bothTeamsMultipleGoals = homeScore >= 2 && awayScore >= 2;
   const dramaticScoreline = totalGoals >= 5 || bothTeamsMultipleGoals;
 
@@ -443,7 +443,7 @@ function pushHighScoringMatchCandidate(candidates, context) {
   candidates.push({
     priority: totalGoals >= 6 ? 93 : 91,
     source: "editorial-match-tempo",
-    text: `${winnerName} venció a ${loserName} en un partido abierto de ${formatSmallNumber(totalGoals)} goles${groupPhrase}.`,
+    text: `${winnerName} venció a ${loserName} en un partido abierto y de mucho ritmo${groupPhrase}.`,
   });
 }
 
@@ -1150,22 +1150,6 @@ function formatStatNumber(value) {
 
 function formatXgNumber(value) {
   return Number(value || 0).toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
-}
-
-function formatSmallNumber(value) {
-  const words = {
-    0: "cero",
-    1: "un",
-    2: "dos",
-    3: "tres",
-    4: "cuatro",
-    5: "cinco",
-    6: "seis",
-    7: "siete",
-    8: "ocho",
-    9: "nueve",
-  };
-  return words[Number(value)] || String(value);
 }
 
 function pushGroupStakesCandidates(candidates, context) {
