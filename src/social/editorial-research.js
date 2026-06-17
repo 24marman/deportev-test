@@ -8,7 +8,7 @@ const FINISHED_STATUSES = new Set(["finished", "final", "cancelled", "postponed"
 const WARM_CONTEXT_STATUSES = new Set(["halftime", "inprogress", "2nd_half", "second_half"]);
 const NEWS_TIMEOUT_MS = Number(process.env.EDITORIAL_RESEARCH_NEWS_TIMEOUT_MS || "2500");
 const DEFAULT_SOURCE_URLS = [
-  "https://www.espn.com/espn/rss/soccer/news",
+  "https://espndeportes.espn.com/espn/rss/soccer/news",
   "https://www.tvazteca.com/aztecadeportes/rss-fut-azteca.rss",
   "https://www.telemundo.com/deportes/copa-mundial-de-la-fifa-2026",
   "https://www.tudn.com/mundial-2026",
