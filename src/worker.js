@@ -12,6 +12,7 @@ const {
   shouldWarmEditorialContext,
   warmEditorialContext,
 } = require("./social/editorial-context-cache");
+const { runEditorialResearch, shouldRunEditorialResearch } = require("./social/editorial-research");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
 
@@ -357,6 +358,15 @@ async function tickMonitor() {
   const monitorEvents = await fetchMonitorEvents();
   const now = new Date().toISOString();
   const strongDelay = getStrongMonitorDelayMinutes();
+
+  if (shouldRunEditorialResearch(state)) {
+    state = await runEditorialResearch({
+      state,
+      events: monitorEvents,
+      fetchMatchData: bsd.fetchMatchData,
+    });
+    await saveMonitorState(state);
+  }
 
   for (const event of monitorEvents) {
     if (!event?.id) continue;

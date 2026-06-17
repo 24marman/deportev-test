@@ -15,14 +15,21 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 
 ## Flujo ideal sin perder velocidad
 
-1. Antes del partido:
+1. Rutina editorial durante el dia:
+   - Correr cada `EDITORIAL_RESEARCH_INTERVAL_MINUTES` minutos mientras el monitor este activo.
+   - Revisar partidos futuros y en vivo dentro de `EDITORIAL_RESEARCH_LOOKAHEAD_HOURS`.
+   - Preparar memoria editorial por partido: jerarquia de selecciones, condicion de campeon vigente, debutantes, grupo, jornada, sede, historial curado y posibles consecuencias.
+   - Si `EDITORIAL_RESEARCH_FEEDS` tiene fuentes RSS/XML configuradas, guardar un digest de titulares/notas recientes para enriquecer la lectura previa sin frenar el post final.
+   - Guardar esa memoria en `monitor-state.json` y en Supabase Storage para que funcione aunque la computadora local este apagada.
+   - No publicar, no renderizar y no llamar a X en esta fase.
+2. Antes del partido:
    - Usar calendario, grupo, sede y perfiles historicos curados.
    - No publicar nada; solo preparar posibles angulos.
-2. Durante el partido:
+3. Durante el partido:
    - En segunda parte o medio tiempo, precalentar contexto editorial.
    - Consultar BSD para incidentes, stats, metadata y h2h.
    - Guardar candidatos editoriales en `monitor-state.json` / Supabase state.
-3. Al finalizar:
+4. Al finalizar:
    - No investigar desde cero.
    - Traer solo datos finales indispensables: evento, goles/incidentes, venue y stats finales.
    - Reutilizar el contexto precalentado si existe.
