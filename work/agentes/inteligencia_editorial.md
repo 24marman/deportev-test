@@ -69,6 +69,9 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Leer shotmap, xG por minuto y momentum para detectar quien tuvo las ocasiones mas claras, si hubo presion final o si el resultado fue contra el flujo del partido.
 - Leer `big_chances`, `dangerous_attack` y `touches_in_penalty_area` como respaldo cuando el shotmap venga incompleto.
 - Si un equipo domina las ocasiones claras y no gana, priorizar esa lectura sobre una frase generica de empate.
+- Las estadisticas avanzadas son criterio interno para elegir el mejor angulo, no una obligacion de mostrar numeros en el tweet.
+- Mantener siempre la estructura corta acordada: resultado + contexto + consecuencia. No convertir el tweet en reporte estadistico.
+- Solo incluir una cifra concreta si es verdaderamente excepcional y mejora la frase; por defecto, traducir la estadistica a lectura editorial: `resistio el dominio`, `fue mas eficaz`, `tuvo las mas claras`, `cerro con mas peligro`.
 
 ## Criterio editorial de jerarquia
 
@@ -124,7 +127,7 @@ El "guru" no es una sola frase generativa; es un sistema de capas:
   - `Haiti suma una victoria historica y llega con vida plena a la ultima jornada.`
   - `Cabo Verde suma un punto historico frente a una de las selecciones candidatas al titulo.`
   - `Arabia Saudita empato con Uruguay y suma un punto valioso ante uno de los favoritos del grupo.`
-- Si una estadistica confirma la historia, integrarla en pocas palabras: `con 12 remates a puerta`, `tras 30 remates`, `con dominio total`.
+- Si una estadistica confirma la historia, integrarla como criterio editorial antes que como dato numerico: `resistio el dominio`, `fue mas eficaz`, `tuvo las mas claras`, `cerro con mas peligro`. Usar numeros solo cuando sean el hecho central.
 
 ## Formato actual de tweet
 

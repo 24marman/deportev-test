@@ -677,39 +677,39 @@ function pushMatchIntelligenceCandidates(candidates, context) {
     const resistantProfile = chanceLeader.side === "home" ? awayProfile : homeProfile;
     const matchup = getFavoriteUnderdog(dominantProfile, resistantProfile);
     const resistantIsUnderdog = matchup?.underdog === resistantProfile;
-    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
     const consequence = resistantIsUnderdog
       ? resistantProfile.debutant
         ? "suma un punto histórico"
         : "suma un punto valioso"
       : "rescata un empate valioso";
+    const contextPhrase = resistantIsUnderdog
+      ? ` ante ${getFavoriteDescription(dominantProfile)}`
+      : ` ante ${dominantName}`;
 
     candidates.push({
       priority: resistantIsUnderdog ? 101 : 94,
       source: "bsd-advanced-stats:chance-quality",
       signature: resistantIsUnderdog ? "underdog-resists-clear-chances-draw" : "team-resists-clear-chances-draw",
-      text: `${dominantName} generó las más claras${statPhrase}, pero ${resistantName} resistió y ${consequence}.`,
+      text: `${resistantName} resistió el dominio de ${dominantName} y ${consequence}${contextPhrase}.`,
     });
   }
 
   if (!isDraw && chanceLeader?.strong && chanceLeader.side === winnerSide) {
-    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
     candidates.push({
       priority: 90,
       source: "bsd-advanced-stats:chance-quality",
       signature: "winner-creates-clearer-chances",
-      text: `${winnerName} generó las ocasiones más claras${statPhrase} y convierte su superioridad en tres puntos${groupPhrase}.`,
+      text: `${winnerName} fue superior y convierte su dominio en tres puntos importantes${groupPhrase}.`,
     });
   }
 
   if (!isDraw && chanceLeader?.strong && chanceLeader.side !== winnerSide) {
     const dominantName = chanceLeader.side === "home" ? homeName : awayName;
-    const statPhrase = getChanceLeaderPhrase(chanceLeader, statSummary);
     candidates.push({
       priority: 92,
       source: "bsd-advanced-stats:efficiency",
       signature: "winner-survives-opponent-clear-chances",
-      text: `${dominantName} generó más peligro${statPhrase}, pero ${winnerName} fue más eficaz y se queda con la victoria.`,
+      text: `${dominantName} llevó el peso del partido, pero ${winnerName} fue más eficaz y se queda con la victoria.`,
     });
   }
 
@@ -742,37 +742,10 @@ function pushMatchIntelligenceCandidates(candidates, context) {
         priority: 86,
         source: "bsd-advanced-stats:big-chances",
         signature: "big-chances-domination",
-        text: `${teamName} acumuló las oportunidades más claras y marcó el tono ofensivo del partido.`,
+        text: `${teamName} tuvo las ocasiones más claras y marcó el ritmo ofensivo del partido.`,
       });
     }
   }
-}
-
-function getChanceLeaderPhrase(leader, statSummary) {
-  const parts = [];
-  const side = leader.side;
-
-  if (statSummary?.shots?.[side] >= 18) {
-    parts.push(`${formatStatNumber(statSummary.shots[side])} remates`);
-  }
-
-  if (statSummary?.xg?.[side] >= 1.5) {
-    parts.push(`${formatXgNumber(statSummary.xg[side])} xG`);
-  }
-
-  if (!parts.length && statSummary?.bigChances?.[side] >= 3) {
-    parts.push(`${formatStatNumber(statSummary.bigChances[side])} ocasiones claras`);
-  }
-
-  if (!parts.length && statSummary?.dangerousAttacks?.[side] >= 55) {
-    parts.push(`${formatStatNumber(statSummary.dangerousAttacks[side])} ataques peligrosos`);
-  }
-
-  if (!parts.length && leader.clearChances >= 2) {
-    parts.push(`${leader.clearChances} ocasiones claras`);
-  }
-
-  return parts.length ? ` con ${parts.slice(0, 2).join(" y ")}` : "";
 }
 
 function analyzeMatchIntelligence(rawStats) {
