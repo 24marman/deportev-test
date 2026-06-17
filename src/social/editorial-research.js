@@ -7,6 +7,32 @@ const teamFacts = require("../data/world-cup-team-facts.json");
 const FINISHED_STATUSES = new Set(["finished", "final", "cancelled", "postponed"]);
 const WARM_CONTEXT_STATUSES = new Set(["halftime", "inprogress", "2nd_half", "second_half"]);
 const NEWS_TIMEOUT_MS = Number(process.env.EDITORIAL_RESEARCH_NEWS_TIMEOUT_MS || "2500");
+const DEFAULT_SOURCE_URLS = [
+  "https://www.espn.com/espn/rss/soccer/news",
+  "https://www.tvazteca.com/aztecadeportes/rss-fut-azteca.rss",
+  "https://www.telemundo.com/deportes/copa-mundial-de-la-fifa-2026",
+  "https://www.tudn.com/mundial-2026",
+];
+const DEFAULT_NEWS_KEYWORDS = [
+  "mundial",
+  "copa mundial",
+  "world cup",
+  "fifa",
+  "futbol",
+  "fútbol",
+  "seleccion",
+  "selección",
+  "argentina",
+  "brasil",
+  "mexico",
+  "méxico",
+  "espana",
+  "españa",
+  "cabo verde",
+  "messi",
+  "mbappe",
+  "haaland",
+];
 
 function isEnabled() {
   return process.env.EDITORIAL_RESEARCH_ENABLED !== "false";
@@ -27,11 +53,23 @@ function getMaxMatches() {
   return Math.max(1, Number.isFinite(value) ? value : 8);
 }
 
-function getFeedUrls() {
-  return String(process.env.EDITORIAL_RESEARCH_FEEDS || "")
+function getSourceUrls() {
+  const configured = `${process.env.EDITORIAL_RESEARCH_SOURCES || ""},${process.env.EDITORIAL_RESEARCH_FEEDS || ""}`
     .split(",")
     .map((url) => url.trim())
     .filter(Boolean);
+  const urls = configured.length ? configured : DEFAULT_SOURCE_URLS;
+
+  return urls.filter((url, index) => urls.indexOf(url) === index);
+}
+
+function getNewsKeywords() {
+  const custom = String(process.env.EDITORIAL_RESEARCH_KEYWORDS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return custom.length ? custom : DEFAULT_NEWS_KEYWORDS;
 }
 
 function minutesSince(value, now = Date.now()) {
@@ -108,9 +146,72 @@ function parseFeedItems(xml, sourceUrl) {
   })).filter((item) => item.title);
 }
 
+function decodeJsString(value) {
+  try {
+    return JSON.parse(`"${String(value || "").replace(/"/g, '\\"')}"`);
+  } catch {
+    return String(value || "");
+  }
+}
+
+function parseHtmlItems(html, sourceUrl) {
+  const raw = String(html || "");
+  const seen = new Set();
+  const items = [];
+  const patterns = [
+    /"headline"\s*:\s*"((?:\\"|[^"])*)"/gi,
+    /"seoTitle"\s*:\s*"((?:\\"|[^"])*)"/gi,
+    /"title"\s*:\s*"((?:\\"|[^"])*)"/gi,
+    /alt="([^"]+)"/gi,
+    /<title[^>]*>([\s\S]*?)<\/title>/gi,
+    /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi,
+    />([^<>]{28,160})</gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(raw)) && items.length < 40) {
+      const title = stripTags(decodeJsString(match[1]));
+      const key = title.toLowerCase();
+      if (!title || title.length < 18 || seen.has(key)) continue;
+      seen.add(key);
+      items.push({
+        sourceUrl,
+        title,
+        link: sourceUrl,
+        publishedAt: "",
+        summary: "",
+        format: "html",
+      });
+    }
+  }
+
+  return items;
+}
+
+function looksLikeXmlFeed(value) {
+  return /<(rss|feed)\b/i.test(String(value || ""));
+}
+
+function normalizeForSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function filterRelevantItems(items) {
+  const keywords = getNewsKeywords().map(normalizeForSearch);
+
+  return items.filter((item) => {
+    const haystack = normalizeForSearch(`${item.title} ${item.summary}`);
+    return keywords.some((keyword) => haystack.includes(keyword));
+  });
+}
+
 function fetchText(url) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { Accept: "application/rss+xml, application/xml, text/xml" } }, (res) => {
+    const req = https.get(url, { headers: { Accept: "application/rss+xml, application/xml, text/xml, text/html" } }, (res) => {
       let body = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => {
@@ -133,14 +234,19 @@ function fetchText(url) {
 }
 
 async function collectNewsDigest() {
-  const urls = getFeedUrls();
+  const urls = getSourceUrls();
   if (!urls.length) return null;
 
   const settled = await Promise.allSettled(
-    urls.map(async (url) => ({
-      url,
-      items: parseFeedItems(await fetchText(url), url),
-    })),
+    urls.map(async (url) => {
+      const body = await fetchText(url);
+      const parsedItems = looksLikeXmlFeed(body) ? parseFeedItems(body, url) : parseHtmlItems(body, url);
+
+      return {
+        url,
+        items: filterRelevantItems(parsedItems).slice(0, 12),
+      };
+    }),
   );
 
   const items = [];

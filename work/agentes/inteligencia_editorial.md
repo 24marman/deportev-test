@@ -12,6 +12,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 - Contexto del dia calculado con todos los partidos de fase de grupos ya finalizados.
 - Forma reciente por seleccion dentro del grupo: victorias, empates o derrotas consecutivas.
 - Base curada local `src/data/world-cup-team-facts.json` para hitos historicos verificables.
+- Fuentes editoriales configurables en `EDITORIAL_RESEARCH_SOURCES`: RSS/XML y paginas HTML de medios deportivos. Se guardan como digest previo, no como verdad final del marcador.
 
 ## Flujo ideal sin perder velocidad
 
@@ -19,7 +20,8 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
    - Correr cada `EDITORIAL_RESEARCH_INTERVAL_MINUTES` minutos mientras el monitor este activo.
    - Revisar partidos futuros y en vivo dentro de `EDITORIAL_RESEARCH_LOOKAHEAD_HOURS`.
    - Preparar memoria editorial por partido: jerarquia de selecciones, condicion de campeon vigente, debutantes, grupo, jornada, sede, historial curado y posibles consecuencias.
-   - Si `EDITORIAL_RESEARCH_FEEDS` tiene fuentes RSS/XML configuradas, guardar un digest de titulares/notas recientes para enriquecer la lectura previa sin frenar el post final.
+   - Si `EDITORIAL_RESEARCH_SOURCES` tiene fuentes RSS/XML o paginas HTML configuradas, guardar un digest de titulares/notas recientes para enriquecer la lectura previa sin frenar el post final.
+   - Filtrar titulares con `EDITORIAL_RESEARCH_KEYWORDS` para priorizar Mundial, futbol y selecciones, evitando ruido de otros deportes.
    - Guardar esa memoria en `monitor-state.json` y en Supabase Storage para que funcione aunque la computadora local este apagada.
    - No publicar, no renderizar y no llamar a X en esta fase.
 2. Antes del partido:
