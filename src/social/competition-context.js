@@ -169,6 +169,9 @@ function buildDayContext(matchData, events = []) {
   }
 
   const allEvents = mergeCurrentEvent(events, currentEvent);
+  const daySchedule = GROUP_STAGE_SCHEDULE.filter((match) => match.date === currentDate);
+  const currentScheduleKey = eventScheduleKey(currentEvent);
+  const currentScheduledIndex = daySchedule.findIndex((match) => scheduledMatchKey(match) === currentScheduleKey);
   const dayEvents = allEvents
     .filter((event) => {
       const scheduled = findScheduledGroupStageMatch(event);
@@ -186,7 +189,7 @@ function buildDayContext(matchData, events = []) {
       isDraw: Number(event.home_score || 0) === Number(event.away_score || 0),
     }));
 
-  const scheduledCount = GROUP_STAGE_SCHEDULE.filter((match) => match.date === currentDate).length;
+  const scheduledCount = daySchedule.length;
   const drawCount = dayEvents.filter((event) => event.isDraw).length;
   const currentIsDraw = Number(currentEvent.home_score || 0) === Number(currentEvent.away_score || 0);
 
@@ -194,6 +197,9 @@ function buildDayContext(matchData, events = []) {
     date: currentDate,
     scheduledCount,
     finishedCount: dayEvents.length,
+    currentScheduledIndex,
+    isFirstScheduledMatch: currentScheduledIndex === 0,
+    isLastScheduledMatch: currentScheduledIndex >= 0 && currentScheduledIndex === scheduledCount - 1,
     drawCount,
     currentIsDraw,
     allFinishedDrawDay: scheduledCount > 0 && dayEvents.length >= scheduledCount && drawCount >= scheduledCount,

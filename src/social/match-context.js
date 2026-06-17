@@ -119,6 +119,9 @@ function buildFactCandidates(matchData) {
   pushDayContextCandidates(candidates, {
     homeName,
     awayName,
+    winnerName,
+    loserName,
+    isDraw,
     day: matchData.context?.day,
   });
   pushDominantFavoriteDrawCandidate(candidates, {
@@ -559,8 +562,46 @@ function pushTeamFormCandidates(candidates, context) {
 }
 
 function pushDayContextCandidates(candidates, context) {
-  const { homeName, awayName, day } = context;
-  if (!day?.currentIsDraw || Number(day.drawRunCount || 0) < 2) return;
+  const { homeName, awayName, winnerName, loserName, isDraw, day } = context;
+  if (!day) return;
+
+  if (day.isFirstScheduledMatch && !isDraw) {
+    candidates.push({
+      priority: 76,
+      source: "editorial-day-context",
+      signature: "winner-opens-day-with-win",
+      text: `${winnerName} abrió la jornada con victoria ante ${loserName}.`,
+    });
+  }
+
+  if (day.isLastScheduledMatch && !isDraw) {
+    candidates.push({
+      priority: 78,
+      source: "editorial-day-context",
+      signature: "winner-closes-day-with-win",
+      text: `${winnerName} cerró la jornada con victoria ante ${loserName}.`,
+    });
+  }
+
+  if (day.isFirstScheduledMatch && isDraw) {
+    candidates.push({
+      priority: 75,
+      source: "editorial-day-context",
+      signature: "draw-opens-day",
+      text: `${homeName} y ${awayName} abrieron la jornada con un empate.`,
+    });
+  }
+
+  if (day.isLastScheduledMatch && isDraw) {
+    candidates.push({
+      priority: 77,
+      source: "editorial-day-context",
+      signature: "draw-closes-day",
+      text: `${homeName} y ${awayName} cerraron la jornada con un empate.`,
+    });
+  }
+
+  if (!day.currentIsDraw || Number(day.drawRunCount || 0) < 2) return;
 
   if (day.allFinishedDrawDay && Number(day.scheduledCount || 0) >= 3) {
     candidates.push({
