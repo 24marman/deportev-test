@@ -346,10 +346,17 @@ function pickHeadline(candidates, matchData) {
 
 function pickHeadlineCandidate(candidates, matchData) {
   const topPriority = candidates[0]?.priority || 0;
-  const spread = topPriority >= 85 ? 0 : 5;
+  const spread = getEditorialSelectionSpread(topPriority);
   const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
   return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
+}
+
+function getEditorialSelectionSpread(topPriority) {
+  if (topPriority >= 110) return 0;
+  if (topPriority >= 95) return 3;
+  if (topPriority >= 85) return 5;
+  return 6;
 }
 
 function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []) {
@@ -1203,16 +1210,23 @@ function pushGroupStakesCandidates(candidates, context) {
   if (!isDraw && matchday === 2) {
     if (Number(winnerAfter.points || 0) >= 6) {
       candidates.push({
-        priority: 101,
+        priority: 93,
         source: "editorial-group-stakes",
         signature: "matchday-two-winner-near-qualification",
         text: `${winnerName} venció a ${loserName} y queda muy cerca de avanzar en el Grupo ${group}.`,
+      });
+
+      candidates.push({
+        priority: 91,
+        source: "editorial-group-stakes",
+        signature: "matchday-two-winner-six-points",
+        text: `${winnerName} llega a seis puntos y toma control de su camino en el Grupo ${group}.`,
       });
     }
 
     if (Number(loserAfter.points || 0) <= 1) {
       candidates.push({
-        priority: 100,
+        priority: 89,
         source: "editorial-group-stakes",
         signature: "matchday-two-loser-under-pressure",
         text: `${loserName} queda bajo presión en el Grupo ${group} y necesita reaccionar en la última jornada.`,
@@ -1227,14 +1241,14 @@ function pushGroupStakesCandidates(candidates, context) {
     if (homePoints <= 2 || awayPoints <= 2) {
       const pressured = homePoints <= awayPoints ? homeName : awayName;
       candidates.push({
-        priority: 99,
+        priority: 90,
         source: "editorial-group-stakes",
         signature: "matchday-two-draw-group-open",
         text: `${pressured} rescató un punto, pero el Grupo ${group} sigue abierto de cara a la última jornada.`,
       });
     } else {
       candidates.push({
-        priority: 95,
+        priority: 88,
         source: "editorial-group-stakes",
         signature: "matchday-two-draw-group-open",
         text: `${homeName} y ${awayName} empataron y dejan el Grupo ${group} abierto de cara a la siguiente jornada.`,
@@ -1248,7 +1262,7 @@ function pushGroupStakesCandidates(candidates, context) {
 
     if (!isDraw && winnerPoints >= 6) {
       candidates.push({
-        priority: 101,
+        priority: 94,
         source: "editorial-group-stakes",
         signature: "matchday-three-winner-qualification-pressure",
         text: `${winnerName} ganó en el cierre del Grupo ${group} y fortalece sus opciones de avanzar.`,
@@ -1257,7 +1271,7 @@ function pushGroupStakesCandidates(candidates, context) {
 
     if (!isDraw && loserPoints <= 3) {
       candidates.push({
-        priority: 100,
+        priority: 93,
         source: "editorial-group-stakes",
         signature: "matchday-three-loser-needs-results",
         text: `${loserName} perdió en el cierre del Grupo ${group} y queda pendiente de otros resultados para avanzar.`,
@@ -1266,7 +1280,7 @@ function pushGroupStakesCandidates(candidates, context) {
 
     if (isDraw) {
       candidates.push({
-        priority: 96,
+        priority: 91,
         source: "editorial-group-stakes",
         signature: "matchday-three-draw-combinations",
         text: `${homeName} y ${awayName} cerraron el Grupo ${group} con un empate que deja todo sujeto a combinaciones.`,
@@ -1301,7 +1315,7 @@ function pushWinnerClassificationCandidates(candidates, context) {
 
   if (winnerOutlook.oneStepFromTopTwo) {
     candidates.push({
-      priority: 106,
+      priority: 94,
       source: "editorial-group-qualification",
       signature: "winner-one-step-from-top-two",
       text: `${winnerName} derrotó a ${loserName} y queda a un paso de avanzar en el Grupo ${group}.`,
@@ -1339,7 +1353,7 @@ function pushDrawGroupOutlookCandidates(candidates, context) {
 
   if (matchday === 2 && groupOutlook.openForFinalDay) {
     candidates.push({
-      priority: 105,
+      priority: 94,
       source: "editorial-group-qualification",
       signature: "group-open-final-matchday",
       text: `${homeName} y ${awayName} empataron y dejan el Grupo ${group} completamente abierto para la última jornada.`,
@@ -1354,7 +1368,7 @@ function pushDrawGroupOutlookCandidates(candidates, context) {
     const teamName = homeKeepsOptions && !awayKeepsOptions ? homeName : awayKeepsOptions && !homeKeepsOptions ? awayName : null;
 
     candidates.push({
-      priority: 102,
+      priority: 87,
       source: "editorial-group-qualification",
       signature: teamName ? "team-keeps-qualification-options" : "both-keep-qualification-options",
       text: teamName
