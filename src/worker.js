@@ -23,6 +23,7 @@ const bsd = require("../work/tools/bsd_match_adapter");
 
 const generatedDir = path.join("outputs", "generated");
 const DEFAULT_AUTOPOST_NOT_BEFORE = "2026-06-14T23:00:00.000Z";
+const DEFAULT_GROUP_STAGE_CONTEXT_START_DATE = "2026-06-11";
 
 function slug(value) {
   return String(value || "")
@@ -132,11 +133,13 @@ async function renderEvent(eventId, options = {}) {
 
 async function enrichCompetitionContext(matchData, contextEvents) {
   try {
+    const contextStartDate = getCompetitionContextStartDate();
     const events =
       contextEvents ||
       (await bsd.fetchEvents({
+        date_from: contextStartDate,
         date_to: matchData.source?.eventDate || new Date().toISOString().slice(0, 10),
-        limit: 100,
+        limit: 200,
       }));
 
     matchData.context = {
@@ -231,6 +234,10 @@ function getMonitoringDateRange(now = new Date()) {
   };
 }
 
+function getCompetitionContextStartDate() {
+  return process.env.COMPETITION_CONTEXT_START_DATE || DEFAULT_GROUP_STAGE_CONTEXT_START_DATE;
+}
+
 function mergeEvents(...eventGroups) {
   const seen = new Set();
   const merged = [];
@@ -270,6 +277,28 @@ async function fetchMonitorEvents() {
   );
 
   return events;
+}
+
+async function fetchCompetitionContextEvents(monitorEvents) {
+  const { dateTo } = getMonitoringDateRange();
+  const contextStartDate = getCompetitionContextStartDate();
+
+  try {
+    const contextEvents = await bsd.fetchEvents({
+      date_from: contextStartDate,
+      date_to: dateTo,
+      limit: 200,
+    });
+    const merged = mergeEvents(contextEvents, monitorEvents);
+    console.log(
+      `Loaded ${merged.length} BSD events for competition context ` +
+        `(${contextStartDate}..${dateTo}).`,
+    );
+    return merged;
+  } catch (error) {
+    console.error(`Could not fetch full competition context: ${error.message}`);
+    return monitorEvents;
+  }
 }
 
 async function processFinishedEvent(event, state, contextEvents) {
@@ -362,6 +391,7 @@ async function maybeWarmEditorialContext(eventId, state, contextEvents) {
 async function tickMonitor() {
   let state = await loadMonitorState();
   const monitorEvents = await fetchMonitorEvents();
+  const contextEvents = await fetchCompetitionContextEvents(monitorEvents);
   const now = new Date().toISOString();
   const strongDelay = getStrongMonitorDelayMinutes();
 
@@ -369,6 +399,7 @@ async function tickMonitor() {
     state = await runEditorialResearch({
       state,
       events: monitorEvents,
+      contextEvents,
       fetchMatchData: bsd.fetchMatchData,
     });
     await saveMonitorState(state);
@@ -441,7 +472,7 @@ async function tickMonitor() {
 
     state.matches[eventId] = nextRecord;
 
-    state = await maybeWarmEditorialContext(eventId, state, monitorEvents);
+    state = await maybeWarmEditorialContext(eventId, state, contextEvents);
 
     if (!isFinishedStatus(nextRecord.status)) continue;
 
@@ -465,7 +496,7 @@ async function tickMonitor() {
       continue;
     }
 
-    state = await processFinishedEvent(event, state, monitorEvents);
+    state = await processFinishedEvent(event, state, contextEvents);
   }
 
   await saveMonitorState(state);

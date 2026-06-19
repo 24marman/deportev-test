@@ -380,7 +380,7 @@ function buildPrematchResearchRecord(event, scheduledMatch, previousRecord) {
   };
 }
 
-async function runEditorialResearch({ state, events, fetchMatchData }) {
+async function runEditorialResearch({ state, events, contextEvents, fetchMatchData }) {
   const startedAt = Date.now();
   const nextState = {
     ...state,
@@ -438,7 +438,7 @@ async function runEditorialResearch({ state, events, fetchMatchData }) {
       const warmed = await warmEditorialContext({
         eventId,
         fetchMatchData: (id) => fetchMatchData(id, { optionalIncidents: true }),
-        contextEvents: events,
+        contextEvents: contextEvents || events,
       });
 
       nextState.matches[eventId] = buildResearchRecord(event, scheduledMatch, warmed, previousRecord);

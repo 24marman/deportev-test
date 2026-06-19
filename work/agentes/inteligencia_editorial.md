@@ -8,7 +8,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 
 - BSD Football API: evento, incidentes, stats, metadata, h2h y calendario.
 - BSD advanced match stats: shotmap, xG por minuto, momentum, ocasiones claras, ataques peligrosos, toques en area, remates y remates a puerta.
-- Tabla de grupo calculada con partidos previos del Mundial 2026.
+- Tabla de grupo calculada con todos los partidos previos del Mundial 2026 desde `COMPETITION_CONTEXT_START_DATE`; no usar solo la ventana corta del monitor.
 - Contexto del dia calculado con todos los partidos de fase de grupos ya finalizados.
 - Forma reciente por seleccion dentro del grupo: victorias, empates o derrotas consecutivas.
 - Base curada local `src/data/world-cup-team-facts.json` para hitos historicos verificables.
@@ -42,6 +42,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 
 - Data inmediata y verificable del partido: BSD API.
 - Estado del grupo: calculado internamente con resultados previos del mismo calendario.
+- Estado global del torneo: calculado internamente con todos los grupos para detectar primer clasificado, clasificaciones nuevas y lideratos asegurados.
 - Hitos historicos estables: base curada local versionada.
 - Internet/noticias: solo debe usarse como proceso de investigacion previo o de mantenimiento de la base curada, no en el momento final del post.
 
