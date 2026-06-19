@@ -275,6 +275,125 @@ function buildPriorGroupContext(matchData, events = []) {
   };
 }
 
+function buildTournamentContext(matchData, events = []) {
+  const currentEvent = getCurrentEvent(matchData);
+  const currentScheduleKey = eventScheduleKey(currentEvent);
+  const currentTime = getEventTime(currentEvent);
+  const currentGroup = matchData.competition?.groupLetter;
+  const homeKey = normalizeTeamKey(matchData.teams?.home?.providerName || matchData.teams?.home?.name);
+  const awayKey = normalizeTeamKey(matchData.teams?.away?.providerName || matchData.teams?.away?.name);
+
+  if (!currentGroup || !currentScheduleKey) return null;
+
+  const before = buildTournamentSnapshot(events, {
+    currentEvent,
+    currentTime,
+    includeCurrent: false,
+  });
+  const after = buildTournamentSnapshot(events, {
+    currentEvent,
+    currentTime,
+    includeCurrent: true,
+  });
+
+  const beforeQualified = new Set(before.qualifiedTopTwo);
+  const beforeFirst = new Set(before.guaranteedFirst);
+  const newlyQualified = after.qualifiedTopTwo.filter((team) => !beforeQualified.has(team));
+  const newlyGuaranteedFirst = after.guaranteedFirst.filter((team) => !beforeFirst.has(team));
+  const currentTeams = new Set([homeKey, awayKey]);
+
+  return {
+    qualifiedBeforeCount: before.qualifiedTopTwo.length,
+    qualifiedAfterCount: after.qualifiedTopTwo.length,
+    newlyQualified: newlyQualified.filter((team) => currentTeams.has(team)),
+    newlyGuaranteedFirst: newlyGuaranteedFirst.filter((team) => currentTeams.has(team)),
+    firstQualifiedThisTournament:
+      before.qualifiedTopTwo.length === 0 && newlyQualified.some((team) => currentTeams.has(team)),
+    home: after.outlooks[homeKey] || null,
+    away: after.outlooks[awayKey] || null,
+  };
+}
+
+function buildTournamentSnapshot(events = [], { currentEvent, currentTime, includeCurrent }) {
+  const tablesByGroup = new Map();
+  const playedKeysByGroup = new Map();
+  const currentScheduleKey = eventScheduleKey(currentEvent);
+
+  for (const match of GROUP_STAGE_SCHEDULE) {
+    if (!tablesByGroup.has(match.group)) {
+      tablesByGroup.set(match.group, new Map());
+      playedKeysByGroup.set(match.group, new Set());
+    }
+
+    const table = tablesByGroup.get(match.group);
+    const home = normalizeTeamKey(match.home);
+    const away = normalizeTeamKey(match.away);
+    if (!table.has(home)) table.set(home, emptyStanding());
+    if (!table.has(away)) table.set(away, emptyStanding());
+  }
+
+  for (const event of mergeCurrentEvent(events, currentEvent)) {
+    if (!event?.id || !isFinished(event.status)) continue;
+    if (!includeCurrent && String(event.id) === String(currentEvent.id)) continue;
+
+    const scheduled = findScheduledGroupStageMatch(event);
+    if (!scheduled) continue;
+    const scheduleKey = scheduledMatchKey(scheduled);
+    if (!includeCurrent && currentScheduleKey && scheduleKey === currentScheduleKey) continue;
+
+    const eventTime = getEventTime(event);
+    if (eventTime && currentTime && eventTime > currentTime) continue;
+
+    const group = scheduled.group;
+    const table = tablesByGroup.get(group);
+    const playedKeys = playedKeysByGroup.get(group);
+    if (!table || !playedKeys) continue;
+
+    const home = normalizeTeamKey(event.home_team);
+    const away = normalizeTeamKey(event.away_team);
+    applyResult(table, home, Number(event.home_score || 0), Number(event.away_score || 0));
+    applyResult(table, away, Number(event.away_score || 0), Number(event.home_score || 0));
+    playedKeys.add(scheduleKey);
+  }
+
+  const qualifiedTopTwo = [];
+  const guaranteedFirst = [];
+  const outlooks = {};
+
+  for (const [group, table] of tablesByGroup.entries()) {
+    const groupSchedule = GROUP_STAGE_SCHEDULE.filter((match) => match.group === group);
+    const groupTeams = getGroupTeams(groupSchedule);
+    const outlook = buildGroupOutlook({
+      afterTable: table,
+      groupSchedule,
+      groupTeams,
+      currentScheduleKey: null,
+      playedScheduleKeys: playedKeysByGroup.get(group) || new Set(),
+      homeKey: null,
+      awayKey: null,
+    });
+
+    for (const team of groupTeams) {
+      const teamOutlook = outlook?.teams?.[team];
+      if (!teamOutlook) continue;
+
+      outlooks[team] = {
+        ...teamOutlook,
+        group,
+      };
+
+      if (teamOutlook.guaranteedTopTwo) qualifiedTopTwo.push(team);
+      if (teamOutlook.guaranteedFirst) guaranteedFirst.push(team);
+    }
+  }
+
+  return {
+    qualifiedTopTwo,
+    guaranteedFirst,
+    outlooks,
+  };
+}
+
 function getGroupTeams(groupSchedule) {
   const teams = new Set();
 
@@ -365,4 +484,5 @@ module.exports = {
   buildPriorGroupContext,
   buildDayContext,
   buildTeamFormContext,
+  buildTournamentContext,
 };

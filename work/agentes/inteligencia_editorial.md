@@ -95,6 +95,108 @@ El marcador nunca se interpreta solo. Antes de escribir, el agente debe cruzar:
 
 Ejemplo de lectura correcta: un empate de Cabo Verde ante España no es solo "partido cerrado"; es un punto historico para una debutante ante una candidata al titulo, y al mismo tiempo un resultado que deja dudas para España.
 
+## Jerarquia narrativa obligatoria
+
+Antes de generar el tweet, el agente debe responder: cual es la noticia mas importante que dejo este partido para la competicion. La descripcion tactica del juego solo puede ser protagonista si no existe una consecuencia competitiva superior.
+
+### Nivel 1: consecuencia decisiva
+
+Prioridad absoluta. Si existe, debe aparecer en el tweet y no puede ser desplazada por posesion, xG, remates, eficacia o dominio territorial.
+
+- Clasificacion matematica a la siguiente ronda.
+- Primer clasificado del torneo.
+- Eliminacion o quedar fuera de la pelea directa.
+- Primer lugar/liderato de grupo asegurado.
+- Titulo, campeonato o avance decisivo en rondas eliminatorias.
+- Record historico verificable.
+- Hito historico mayor: primera clasificacion, primera victoria mundialista, primer punto mundialista si cambia la historia de una seleccion.
+
+Ejemplos:
+
+- `Mexico vencio a Corea del Sur, asegura el liderato del Grupo A y se convierte en el primer clasificado del Mundial.`
+- `Argentina vencio a Ghana y asegura matematicamente su clasificacion a la siguiente fase.`
+- `Uruguay gano y asegura el primer lugar del Grupo H.`
+- `Japon cayo ante Suecia y queda fuera de la pelea directa por avanzar.`
+
+### Nivel 2: consecuencia fuerte de tabla
+
+Compite con otros angulos fuertes, pero tiene preferencia sobre analisis tactico comun. Puede ser desplazado por un Nivel 1 o por un hecho de partido extraordinario si la consecuencia no es definitiva.
+
+- Equipo queda a un paso de avanzar.
+- Equipo llega a seis puntos sin asegurar matematicamente.
+- Equipo queda bajo presion para la ultima jornada.
+- Grupo queda completamente abierto.
+- Equipo ya no depende de si mismo.
+- Resultado altera significativamente el escenario del grupo.
+
+Ejemplos:
+
+- `Brasil llega a seis puntos y toma control de su camino en el Grupo B.`
+- `Cabo Verde queda bajo presion en el Grupo E y necesita reaccionar en la ultima jornada.`
+- `España y Marruecos empataron y dejan el Grupo E completamente abierto para la ultima jornada.`
+
+### Nivel 3: noticia del partido
+
+Se usa cuando no hay consecuencia competitiva superior o cuando el acontecimiento del partido es mas noticioso que una consecuencia blanda.
+
+- Remontada.
+- Victoria o empate decidido en los minutos finales.
+- Goleada.
+- Partido de alto ritmo.
+- Resultado sorpresivo.
+- Penal decisivo o autogol determinante.
+
+Ejemplos:
+
+- `Canada igualo en el 90+3' y evita la derrota en el Grupo B.`
+- `Inglaterra vencio a Croacia en un partido abierto y de mucho ritmo en el Grupo L.`
+- `Cabo Verde sorprendio a España y firma una victoria historica.`
+
+### Nivel 4: hito o actuacion individual
+
+Se usa cuando el hito individual es la noticia o cuando complementa una consecuencia mayor sin alargar demasiado.
+
+- Hat-trick.
+- Doblete decisivo.
+- Primer gol mundialista.
+- Debut destacado.
+- Lesion importante si cambia el torneo.
+- Portero o jugador clave si las estadisticas respaldan el impacto.
+
+Ejemplos:
+
+- `Haiti marco su primer gol mundialista y sostiene opciones en el grupo.`
+- `El hat-trick de X encamina una victoria clave para su seleccion.`
+
+### Nivel 5: lectura tactica y estadistica
+
+Solo domina el tweet si no hay consecuencia competitiva mas importante. Debe traducirse a lectura humana, no a lista de cifras.
+
+- Dominio de posesion.
+- xG, shotmap, remates, tiros a puerta.
+- Ocasiones claras.
+- Momentum o presion final.
+- Eficacia ofensiva o defensiva.
+- Partido de pocas llegadas.
+
+Ejemplos:
+
+- `Corea del Sur llevo el peso del partido, pero Mexico fue mas eficaz y se queda con la victoria.`
+- `Portugal y RD Congo empataron en un partido de pocas llegadas y poco margen ofensivo.`
+
+### Nivel 6: contexto complementario
+
+Solo se usa si no hay una historia mejor o como detalle secundario muy breve.
+
+- Primer/ultimo partido del dia.
+- Jornada marcada por empates.
+- Curiosidades del calendario.
+- Datos historicos menores.
+
+### Regla de desempate
+
+Si dos narrativas compiten por espacio, elegir la de mayor impacto para la competicion. Una observacion tactica nunca puede desplazar una clasificacion, eliminacion, liderato asegurado, record o hito historico mayor. Si ambas son relevantes, combinarlas en una sola frase corta y dejar fuera el detalle menos importante.
+
 ## RAG y fuentes externas
 
 Un RAG puede ser util para la version avanzada, pero no debe bloquear el post final. El uso correcto seria:

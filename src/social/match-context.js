@@ -56,6 +56,8 @@ function buildFactCandidates(matchData) {
   const matchday = Number(matchData.competition?.matchdayNumber || 0);
   const homeName = normalizeTeamName(home.name);
   const awayName = normalizeTeamName(away.name);
+  const homeKey = normalizeTeamKey(home.providerName || home.name);
+  const awayKey = normalizeTeamKey(away.providerName || away.name);
   const homeFacts = getTeamFacts(home.providerName || home.name);
   const awayFacts = getTeamFacts(away.providerName || away.name);
   const prior = matchData.context?.priorGroup || {};
@@ -77,6 +79,8 @@ function buildFactCandidates(matchData) {
   const loserScore = Math.min(homeScore, awayScore);
   const winnerName = normalizeTeamName(winner.name);
   const loserName = normalizeTeamName(loser.name);
+  const winnerKey = homeScore > awayScore ? homeKey : awayKey;
+  const loserKey = homeScore > awayScore ? awayKey : homeKey;
   const winnerFacts = homeScore > awayScore ? homeFacts : awayFacts;
   const winnerPrior = homeScore > awayScore ? homePrior : awayPrior;
   const homeProfile = buildEditorialProfile(homeName, homeFacts, homePrior);
@@ -281,8 +285,12 @@ function buildFactCandidates(matchData) {
   pushGroupStakesCandidates(candidates, {
     homeName,
     awayName,
+    homeKey,
+    awayKey,
     winnerName,
     loserName,
+    winnerKey,
+    loserKey,
     isDraw,
     matchday,
     group,
@@ -291,6 +299,19 @@ function buildFactCandidates(matchData) {
     winnerAfter,
     loserAfter,
     groupOutlook: prior.groupOutlook,
+  });
+  pushTournamentConsequenceCandidates(candidates, {
+    homeName,
+    awayName,
+    homeKey,
+    awayKey,
+    winnerName,
+    loserName,
+    winnerKey,
+    loserKey,
+    isDraw,
+    group,
+    tournament: matchData.context?.tournament,
   });
 
   if (matchday === 1 && !isDraw) {
@@ -345,11 +366,31 @@ function pickHeadline(candidates, matchData) {
 }
 
 function pickHeadlineCandidate(candidates, matchData) {
+  const absoluteCandidates = candidates.filter(isAbsoluteNarrativeCandidate);
+  if (absoluteCandidates.length) {
+    return absoluteCandidates[0];
+  }
+
   const topPriority = candidates[0]?.priority || 0;
   const spread = getEditorialSelectionSpread(topPriority);
   const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
   return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
+}
+
+function isAbsoluteNarrativeCandidate(candidate) {
+  if (Number(candidate?.level || 0) === 1) return true;
+
+  return new Set([
+    "first-qualified-and-group-winner",
+    "first-qualified-tournament",
+    "newly-qualified-and-group-winner",
+    "newly-qualified-tournament",
+    "winner-guaranteed-first",
+    "winner-guaranteed-top-two",
+    "loser-eliminated-top-two",
+    "loser-no-longer-controls-top-two",
+  ]).has(candidate?.signature);
 }
 
 function getEditorialSelectionSpread(topPriority) {
@@ -365,17 +406,55 @@ function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []
   return candidates
     .map((candidate) => {
       const signature = candidate.signature || getEditorialSignature(candidate.text);
-      const repeatPenalty = recent.has(signature) ? 18 : 0;
+      const level = Number(candidate.level || getCandidateNarrativeLevel(candidate));
+      const repeatPenalty = level === 1 ? 0 : recent.has(signature) ? 18 : 0;
 
       return {
         ...candidate,
         signature,
+        level,
         priority: Number(candidate.priority || 0) - repeatPenalty,
         originalPriority: candidate.priority,
         repeatPenalty,
       };
     })
-    .sort((a, b) => b.priority - a.priority);
+    .sort((a, b) => {
+      if (a.level === 1 && b.level !== 1) return -1;
+      if (b.level === 1 && a.level !== 1) return 1;
+      return b.priority - a.priority;
+    });
+}
+
+function getCandidateNarrativeLevel(candidate) {
+  if (isAbsoluteNarrativeCandidate(candidate)) return 1;
+
+  const signature = candidate?.signature || "";
+  const source = candidate?.source || "";
+
+  if (
+    source === "editorial-group-stakes" ||
+    signature === "winner-one-step-from-top-two" ||
+    signature === "group-open-final-matchday" ||
+    signature === "matchday-two-winner-near-qualification" ||
+    signature === "matchday-two-winner-six-points" ||
+    signature === "matchday-two-loser-under-pressure"
+  ) {
+    return 2;
+  }
+
+  if (
+    source === "bsd-incidents:late-decisive-goal" ||
+    source === "editorial-match-tempo" ||
+    source === "bsd-scoreline" ||
+    source === "bsd-tournament-results" ||
+    source === "editorial-hierarchy"
+  ) {
+    return 3;
+  }
+
+  if (source.includes("world-cup-team-facts") || source === "editorial-team-form") return 4;
+  if (source.includes("stats") || source.includes("advanced-stats")) return 5;
+  return 6;
 }
 
 function getEditorialSignature(text) {
@@ -1289,6 +1368,102 @@ function pushGroupStakesCandidates(candidates, context) {
   }
 }
 
+function pushTournamentConsequenceCandidates(candidates, context) {
+  const {
+    homeName,
+    awayName,
+    homeKey,
+    awayKey,
+    winnerName,
+    loserName,
+    winnerKey,
+    isDraw,
+    group,
+    tournament,
+  } = context;
+
+  if (!group || !tournament) return;
+
+  const newlyQualified = new Set(tournament.newlyQualified || []);
+  const newlyGuaranteedFirst = new Set(tournament.newlyGuaranteedFirst || []);
+  const teamNameByKey = {
+    [homeKey]: homeName,
+    [awayKey]: awayName,
+  };
+  const newlyQualifiedCurrentTeams = [homeKey, awayKey].filter((team) => newlyQualified.has(team));
+
+  for (const teamKey of newlyQualifiedCurrentTeams) {
+    const teamName = teamNameByKey[teamKey];
+    const opponentName = teamKey === homeKey ? awayName : homeName;
+    const won = !isDraw && teamKey === winnerKey;
+    const firstQualified = Boolean(tournament.firstQualifiedThisTournament);
+    const guaranteedFirst = newlyGuaranteedFirst.has(teamKey);
+
+    if (firstQualified && guaranteedFirst && won) {
+      candidates.push({
+        priority: 130,
+        level: 1,
+        source: "editorial-tournament-consequence",
+        signature: "first-qualified-and-group-winner",
+        text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y se convierte en el primer clasificado del Mundial.`,
+      });
+      continue;
+    }
+
+    if (firstQualified) {
+      candidates.push({
+        priority: 128,
+        level: 1,
+        source: "editorial-tournament-consequence",
+        signature: "first-qualified-tournament",
+        text: won
+          ? `${teamName} venció a ${opponentName} y se convierte en el primer clasificado del Mundial.`
+          : `${teamName} asegura su clasificación y se convierte en el primer clasificado del Mundial.`,
+      });
+      continue;
+    }
+
+    if (guaranteedFirst && won) {
+      candidates.push({
+        priority: 124,
+        level: 1,
+        source: "editorial-tournament-consequence",
+        signature: "newly-qualified-and-group-winner",
+        text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y avanza a la siguiente fase.`,
+      });
+      continue;
+    }
+
+    candidates.push({
+      priority: 121,
+      level: 1,
+      source: "editorial-tournament-consequence",
+      signature: "newly-qualified-tournament",
+      text: won
+        ? `${teamName} venció a ${opponentName} y asegura su clasificación a la siguiente fase.`
+        : `${teamName} asegura su clasificación a la siguiente fase tras el resultado del Grupo ${group}.`,
+    });
+  }
+
+  for (const teamKey of [homeKey, awayKey]) {
+    if (!newlyGuaranteedFirst.has(teamKey) || newlyQualified.has(teamKey)) continue;
+
+    const teamName = teamNameByKey[teamKey];
+    const opponentName = teamKey === homeKey ? awayName : homeName;
+    const won = !isDraw && teamKey === winnerKey;
+
+    candidates.push({
+      priority: 120,
+      level: 1,
+      source: "editorial-tournament-consequence",
+      signature: "newly-guaranteed-first",
+      text: won
+        ? `${teamName} venció a ${opponentName} y asegura el primer lugar del Grupo ${group}.`
+        : `${teamName} asegura el primer lugar del Grupo ${group}.`,
+    });
+  }
+}
+
 function pushWinnerClassificationCandidates(candidates, context) {
   const { winnerName, loserName, group, winnerOutlook } = context;
   if (!winnerOutlook) return;
@@ -1296,6 +1471,7 @@ function pushWinnerClassificationCandidates(candidates, context) {
   if (winnerOutlook.guaranteedFirst) {
     candidates.push({
       priority: 115,
+      level: 1,
       source: "editorial-group-qualification",
       signature: "winner-guaranteed-first",
       text: `${winnerName} venció a ${loserName} y asegura el primer lugar del Grupo ${group}.`,
@@ -1306,6 +1482,7 @@ function pushWinnerClassificationCandidates(candidates, context) {
   if (winnerOutlook.guaranteedTopTwo) {
     candidates.push({
       priority: 114,
+      level: 1,
       source: "editorial-group-qualification",
       signature: "winner-guaranteed-top-two",
       text: `${winnerName} venció a ${loserName} y asegura matemáticamente su clasificación a la siguiente fase.`,
@@ -1330,6 +1507,7 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
   if (loserOutlook.eliminatedTopTwo) {
     candidates.push({
       priority: 113,
+      level: 1,
       source: "editorial-group-qualification",
       signature: "loser-eliminated-top-two",
       text: `${loserName} cayó ante ${winnerName} y queda fuera de la pelea directa por avanzar.`,
@@ -1340,6 +1518,7 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
   if (loserOutlook.noLongerControlsTopTwo) {
     candidates.push({
       priority: 112,
+      level: 1,
       source: "editorial-group-qualification",
       signature: "loser-no-longer-controls-top-two",
       text: `${loserName} cayó ante ${winnerName} y ya no depende de sí mismo para avanzar.`,

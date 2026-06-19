@@ -1,4 +1,4 @@
-const { buildPriorGroupContext } = require("./competition-context");
+const { buildPriorGroupContext, buildTournamentContext } = require("./competition-context");
 const { getInternalContext } = require("./match-context");
 
 function getWarmupAgeMinutes(record, now = Date.now()) {
@@ -26,6 +26,7 @@ async function warmEditorialContext({ eventId, fetchMatchData, contextEvents }) 
   matchData.context = {
     ...(matchData.context || {}),
     priorGroup: buildPriorGroupContext(matchData, contextEvents || []),
+    tournament: buildTournamentContext(matchData, contextEvents || []),
   };
 
   const context = getInternalContext(matchData);

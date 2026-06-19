@@ -6,7 +6,12 @@ const { renderMatchCard } = require("./render-match-card");
 const { uploadGeneratedImage } = require("./lib/storage");
 const { loadMonitorState, saveMonitorState } = require("./lib/monitor-state");
 const { findScheduledGroupStageMatch } = require("./lib/world-cup-group-stage-schedule");
-const { buildDayContext, buildPriorGroupContext, buildTeamFormContext } = require("./social/competition-context");
+const {
+  buildDayContext,
+  buildPriorGroupContext,
+  buildTeamFormContext,
+  buildTournamentContext,
+} = require("./social/competition-context");
 const {
   applyWarmEditorialContext,
   shouldWarmEditorialContext,
@@ -139,6 +144,7 @@ async function enrichCompetitionContext(matchData, contextEvents) {
       day: buildDayContext(matchData, events),
       priorGroup: buildPriorGroupContext(matchData, events),
       teamForm: buildTeamFormContext(matchData, events),
+      tournament: buildTournamentContext(matchData, events),
     };
   } catch (error) {
     console.error(`Competition context unavailable: ${error.message}`);
