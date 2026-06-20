@@ -462,6 +462,8 @@ function buildGroupOutlook({ afterTable, groupSchedule, groupTeams, currentSched
     outlook.noLongerControlsTopTwo =
       outlook.remainingGames > 0 && outlook.rank > 2 && outlook.maxPoints <= secondPlacePoints;
     outlook.eliminatedTopTwo = outlook.remainingGames === 0 && outlook.rank > 2;
+    outlook.eliminatedRoundOf32 = outlook.remainingGames === 0 && outlook.rank > 3;
+    outlook.thirdPlacePending = outlook.remainingGames === 0 && outlook.rank === 3;
   }
 
   const aliveForTopTwo = groupTeams.filter((team) => byTeam[team].maxPoints >= secondPlacePoints).length;

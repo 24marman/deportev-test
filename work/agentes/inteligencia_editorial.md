@@ -9,6 +9,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 - BSD Football API: evento, incidentes, stats, metadata, h2h y calendario.
 - BSD advanced match stats: shotmap, xG por minuto, momentum, ocasiones claras, ataques peligrosos, toques en area, remates y remates a puerta.
 - Tabla de grupo calculada con todos los partidos previos del Mundial 2026 desde `COMPETITION_CONTEXT_START_DATE`; no usar solo la ventana corta del monitor.
+- Formato Mundial 2026: avanzan los dos primeros de cada grupo y tambien los ocho mejores terceros. No confundir "fuera de top 2" con "eliminado".
 - Contexto del dia calculado con todos los partidos de fase de grupos ya finalizados.
 - Forma reciente por seleccion dentro del grupo: victorias, empates o derrotas consecutivas.
 - Base curada local `src/data/world-cup-team-facts.json` para hitos historicos verificables.
@@ -63,7 +64,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Detectar cuando el marcador cambia de significado por contexto: empate historico de debutante, sorpresa de una seleccion menor, decepcion de una favorita, triunfo esperado o resultado que deja dudas.
 - Detectar partidos destacados por marcador y ritmo: 3-2, 3-3, 4-3, 4-4, cinco o mas goles, ambos equipos con multiples goles, y reforzarlo con remates, tiros a puerta o xG si la API lo trae.
 - Detectar goles decisivos en los ultimos minutos: empate rescatado, triunfo agonico, remontada o gol que cambia por completo el cierre emocional del partido.
-- Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos abiertos y cierres sujetos a combinaciones.
+- Desde Jornada 2, leer la tabla como editor: equipos que quedan muy perfilados, equipos que se complican, obligacion de ganar en Jornada 3, grupos abiertos y cierres sujetos a combinaciones. Recordar que el tercer lugar aun puede avanzar.
 - Priorizar consecuencias de clasificacion cuando sean el dato mas importante: clasificacion matematica, primer lugar asegurado, quedar a un paso de avanzar, perder control del pase o dejar el grupo abierto para la ultima jornada.
 - No crear una seccion aparte de clasificacion. Si la tabla importa, debe integrarse dentro de la misma frase corta del tweet.
 - No mencionar siempre la tabla. Si no hay consecuencia relevante, centrarse en el resultado, el contexto deportivo, goles decisivos, jerarquia o estadisticas.
@@ -71,7 +72,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Leer el contexto completo del dia: si varios partidos terminan empatados o todos los partidos del dia fueron empate, usarlo como angulo editorial cuando sea mas relevante que una frase generica.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
-- No inventar records ni clasificaciones si la data no los sostiene. Una noticia puede sugerir que el tema importa, pero solo la tabla calculada, el API o la base curada pueden confirmar el hecho.
+- No inventar records, clasificaciones ni eliminaciones si la data no los sostiene. Una noticia puede sugerir que el tema importa, pero solo la tabla calculada, el API, el formato del torneo o la base curada pueden confirmar el hecho.
 - Escribir corto: una linea como objetivo, dos maximo si el contexto lo justifica. Evitar frases largas con demasiadas ideas.
 - Nombrar el contexto especifico: rival, favorito, debutante, grupo, momento del gol, consecuencia o duda que deja el resultado. No usar frases comodin tipo "senal de caracter" si no agregan una lectura unica.
 - Mantener intensidad proporcional: partidos normales se describen sobrios; hechos excepcionales solo se destacan si la data lo justifica.
@@ -119,6 +120,8 @@ Ejemplos:
 - `Argentina vencio a Ghana y asegura matematicamente su clasificacion a la siguiente fase.`
 - `Uruguay gano y asegura el primer lugar del Grupo H.`
 - `Japon cayo ante Suecia y queda fuera de la pelea directa por avanzar.`
+
+Nota 2026: quedar fuera de los dos primeros lugares no equivale automaticamente a eliminacion, porque tambien avanzan ocho mejores terceros. Si una seleccion aun puede terminar tercera, usar lenguaje tipo `queda contra la pared`, `necesita ganar y esperar`, o `dependera de la tabla de terceros`; no escribir `eliminada`.
 
 ### Nivel 2: consecuencia fuerte de tabla
 

@@ -482,8 +482,7 @@ function isAbsoluteNarrativeCandidate(candidate) {
     "newly-qualified-tournament",
     "winner-guaranteed-first",
     "winner-guaranteed-top-two",
-    "loser-eliminated-top-two",
-    "loser-no-longer-controls-top-two",
+    "loser-eliminated-round-of-32",
   ]).has(candidate?.signature);
 }
 
@@ -641,7 +640,9 @@ function getCandidateNarrativeLevel(candidate) {
     signature === "group-open-final-matchday" ||
     signature === "matchday-two-winner-near-qualification" ||
     signature === "matchday-two-winner-six-points" ||
-    signature === "matchday-two-loser-under-pressure"
+    signature === "matchday-two-loser-under-pressure" ||
+    signature === "loser-misses-top-two" ||
+    signature === "loser-no-longer-controls-top-two"
   ) {
     return 2;
   }
@@ -1710,24 +1711,35 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
   const { winnerName, loserName, loserOutlook } = context;
   if (!loserOutlook) return;
 
-  if (loserOutlook.eliminatedTopTwo) {
+  if (loserOutlook.eliminatedRoundOf32) {
     candidates.push({
       priority: 113,
       level: 1,
       source: "editorial-group-qualification",
-      signature: "loser-eliminated-top-two",
-      text: `${loserName} cayó ante ${winnerName} y queda fuera de la pelea directa por avanzar.`,
+      signature: "loser-eliminated-round-of-32",
+      text: `${loserName} cayó ante ${winnerName} y queda eliminado del Mundial.`,
+    });
+    return;
+  }
+
+  if (loserOutlook.eliminatedTopTwo) {
+    candidates.push({
+      priority: 96,
+      source: "editorial-group-qualification",
+      signature: "loser-misses-top-two",
+      text: loserOutlook.thirdPlacePending
+        ? `${loserName} queda fuera de los dos primeros puestos y dependerá de la tabla de terceros.`
+        : `${loserName} queda fuera de los dos primeros puestos del grupo.`,
     });
     return;
   }
 
   if (loserOutlook.noLongerControlsTopTwo) {
     candidates.push({
-      priority: 112,
-      level: 1,
+      priority: 90,
       source: "editorial-group-qualification",
       signature: "loser-no-longer-controls-top-two",
-      text: `${loserName} cayó ante ${winnerName} y ya no depende de sí mismo para avanzar.`,
+      text: `${loserName} queda contra la pared y necesita ganar en la última jornada para seguir con vida.`,
     });
   }
 }

@@ -219,4 +219,43 @@ runNegativeCase({
   rejectIncludes: ["asegura", "clasificación", "clasificado"],
 });
 
+const brazilHaitiMatchdayTwo = baseMatch({
+  eventId: 8001,
+  home: "Brazil",
+  away: "Haiti",
+  homeScore: 3,
+  awayScore: 0,
+  group: "C",
+  matchday: 2,
+  priorGroup: {
+    homePrior: { played: 1, wins: 0, draws: 1, losses: 0, points: 1, goalsFor: 1, goalsAgainst: 1 },
+    awayPrior: { played: 1, wins: 0, draws: 0, losses: 1, points: 0, goalsFor: 0, goalsAgainst: 1 },
+    homeAfter: { played: 2, wins: 1, draws: 1, losses: 0, points: 4, goalsFor: 4, goalsAgainst: 1 },
+    awayAfter: { played: 2, wins: 0, draws: 0, losses: 2, points: 0, goalsFor: 0, goalsAgainst: 4 },
+    groupOutlook: {
+      home: { remainingGames: 1, guaranteedTopTwo: false, oneStepFromTopTwo: false },
+      away: {
+        remainingGames: 1,
+        guaranteedTopTwo: false,
+        oneStepFromTopTwo: false,
+        noLongerControlsTopTwo: true,
+        eliminatedTopTwo: false,
+        eliminatedRoundOf32: false,
+      },
+    },
+  },
+});
+
+runCase({
+  name: "third-place route avoids premature elimination angle",
+  matchData: brazilHaitiMatchdayTwo,
+  expectIncludes: ["Brasil", "primera victoria"],
+});
+
+runNegativeCase({
+  name: "third-place route does not call Haiti eliminated",
+  matchData: brazilHaitiMatchdayTwo,
+  rejectIncludes: ["eliminado", "eliminada", "ya no depende"],
+});
+
 console.log("Editorial smoke tests passed.");
