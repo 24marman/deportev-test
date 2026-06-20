@@ -339,13 +339,13 @@ body {
 
 .leader-portrait {
   position: absolute;
-  top: -48px;
+  top: -104px;
   left: 50%;
-  width: 560px;
-  height: 560px;
+  width: 360px;
+  height: 360px;
   transform: translateX(-50%);
   object-fit: cover;
-  object-position: center 6%;
+  object-position: center center;
   filter: grayscale(1) contrast(1.25) brightness(1.03);
   mix-blend-mode: normal;
 }
