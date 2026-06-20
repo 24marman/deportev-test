@@ -335,25 +335,31 @@ body {
   width: 300px;
   height: 162px;
   overflow: hidden;
-  display: grid;
-  place-items: start center;
 }
 
 .leader-portrait {
-  width: 520px;
-  height: 520px;
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  width: 560px;
+  height: 560px;
+  transform: translateX(-50%);
   object-fit: cover;
-  object-position: center 12%;
+  object-position: center 6%;
   filter: grayscale(1) contrast(1.25) brightness(1.03);
   mix-blend-mode: normal;
 }
 
 .leader-portrait-fallback {
   position: absolute;
-  inset: 0;
+  top: -48px;
+  left: 50%;
+  width: 560px;
+  height: 560px;
+  transform: translateX(-50%);
   background-image: url("./assets/player-photo-placeholder.webp");
-  background-size: 520px 520px;
-  background-position: -126px -8px;
+  background-size: 560px 560px;
+  background-position: center 6%;
   background-repeat: no-repeat;
   filter: grayscale(1) contrast(1.45);
   opacity: 0.9;

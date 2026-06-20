@@ -28,6 +28,7 @@ La regla clave es: la IA puede ayudar a crear la versión estilizada una vez, pe
    - ángulo frontal o tres cuartos,
    - cuello visible,
    - mínimo de jersey/hombros,
+   - composición suficientemente cerrada para llenar el alto del rectángulo,
    - sin manos, logos grandes u objetos tapando la cara.
 9. Detecta rostro y recorta con perfil `face-neck-tight`.
 10. Orienta la imagen hacia el look del template:
@@ -86,6 +87,8 @@ player-assets/
 - Si no existe retrato aprobado, el template usa placeholder y reporta el faltante.
 - La foto final debe mostrar pura cara, cuello y muy poco hombro.
 - La playera no debe ser protagonista visual del retrato.
+- El retrato debe llenar verticalmente el rectángulo del template sin aire arriba ni abajo.
+- Es aceptable cortar un poco cabello o parte superior de cabeza si mejora el llenado del bloque.
 - La salida aprobada debe pesar poco y servirse como `.webp`.
 - El asset aprobado vive en Supabase, no en la computadora local.
 
@@ -96,6 +99,7 @@ Antes de aprobar:
 - El jugador se reconoce claramente.
 - La cara no parece generada desde cero.
 - El recorte no muestra torso ni playera dominante.
+- El retrato llena el alto del renglón sin espacios vacíos visibles.
 - El tamaño funciona dentro del rectángulo del template.
 - El grunge no tapa ojos, nariz ni boca.
 - El contraste funciona sobre el fondo oscuro.
