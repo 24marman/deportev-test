@@ -6,7 +6,7 @@ const topScorersData = {
     matchdayNumber: "2",
   },
   background: {
-    image: "../figma_match_card/assets/backgrounds/generic.webp",
+    image: "./assets/bg.webp",
   },
   leaders: [
     {
@@ -64,9 +64,9 @@ function setAssetBindings(root, data) {
   });
 }
 
-function createLeaderRow(leader, index) {
+function createLeaderRow(leader, index, topGoals) {
   const row = document.createElement("article");
-  row.className = `leader-row${index === 0 ? " is-first" : ""}`;
+  row.className = `leader-row${Number(leader.goals) === topGoals ? " is-top" : ""}`;
 
   const green = document.createElement("div");
   green.className = "leader-green";
@@ -131,6 +131,8 @@ function renderTopScorersCard(data = topScorersData) {
   const root = document.getElementById("match-card");
   const leaderboard = root.querySelector("[data-leaderboard]");
   const leaders = Array.isArray(data.leaders) ? data.leaders.slice(0, 5) : [];
+  const numericGoals = leaders.map((leader) => Number(leader.goals)).filter(Number.isFinite);
+  const topGoals = numericGoals.length ? Math.max(...numericGoals) : null;
 
   setTextBindings(root, data);
   setAssetBindings(root, data);
@@ -138,7 +140,7 @@ function renderTopScorersCard(data = topScorersData) {
     root.style.setProperty("--card-bg-image", `url("${data.background.image}")`);
   }
   leaderboard.innerHTML = "";
-  leaders.forEach((leader, index) => leaderboard.append(createLeaderRow(leader, index)));
+  leaders.forEach((leader, index) => leaderboard.append(createLeaderRow(leader, index, topGoals)));
   fitLeaderText(root);
 }
 

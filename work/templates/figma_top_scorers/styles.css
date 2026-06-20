@@ -70,7 +70,7 @@ body {
   overflow: hidden;
   isolation: isolate;
   background: #050505;
-  --card-bg-image: url("../figma_match_card/assets/backgrounds/generic.webp");
+  --card-bg-image: url("./assets/bg.webp");
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 
@@ -81,19 +81,6 @@ body {
   width: 1080px;
   height: 1350px;
   object-fit: cover;
-}
-
-.top-scorers-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 7% 3%, rgba(255, 255, 255, 0.28), transparent 8%),
-    radial-gradient(circle at 93% 3%, rgba(255, 255, 255, 0.28), transparent 8%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.25));
-  mix-blend-mode: screen;
 }
 
 .card-header {
@@ -218,8 +205,8 @@ body {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: rgb(158, 158, 158);
-  opacity: 0.42;
+  background: #9e9e9e;
+  opacity: 0.82;
   mix-blend-mode: color-dodge;
 }
 
@@ -231,11 +218,11 @@ body {
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' seed='18'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .72'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
-  opacity: 0.42;
-  mix-blend-mode: multiply;
+  opacity: 0.34;
+  mix-blend-mode: overlay;
 }
 
-.leader-row.is-first .leader-green {
+.leader-row.is-top .leader-green {
   opacity: 1;
 }
 
@@ -263,23 +250,41 @@ body {
   place-items: center;
 }
 
+.flag-frame::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='4' seed='28'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .64'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  opacity: 0.38;
+  mix-blend-mode: multiply;
+}
+
 .flag-frame::after {
   content: "";
   position: absolute;
+  z-index: 3;
   inset: 0;
-  border: 6px solid var(--green);
   border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 54px, var(--green) 55px 60px, transparent 61px);
   mix-blend-mode: difference;
   filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
 }
 
 .leader-flag {
-  width: 116px;
-  height: 116px;
+  position: relative;
+  z-index: 1;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   object-fit: cover;
   background: #d9d9d9;
-  filter: contrast(1.05) saturate(1.1);
+  filter: contrast(0.98) saturate(0.88) brightness(0.9);
+  mix-blend-mode: difference;
 }
 
 .leader-copy {
@@ -318,6 +323,7 @@ body {
   letter-spacing: 1.5px;
   text-overflow: clip;
   white-space: nowrap;
+  mix-blend-mode: difference;
 }
 
 .leader-portrait-wrap {
@@ -344,12 +350,12 @@ body {
 .leader-portrait-fallback {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at 58% 38%, rgba(245, 243, 244, 0.78) 0 13%, transparent 14%),
-    radial-gradient(ellipse at 58% 88%, rgba(245, 243, 244, 0.52) 0 32%, transparent 33%),
-    linear-gradient(120deg, transparent 0 34%, rgba(245, 243, 244, 0.18) 35% 61%, transparent 62%);
+  background-image: url("./assets/player-photo-placeholder.webp");
+  background-size: 300px 300px;
+  background-position: -2px -20px;
+  background-repeat: no-repeat;
   filter: grayscale(1) contrast(1.45);
-  opacity: 0.72;
+  opacity: 0.9;
   mix-blend-mode: normal;
 }
 
@@ -368,6 +374,11 @@ body {
   font-weight: 950;
   line-height: 1;
   letter-spacing: -0.04em;
+}
+
+.leader-row.is-top .leader-score {
+  color: var(--white);
+  opacity: 0.9;
 }
 
 .deportev-logo {

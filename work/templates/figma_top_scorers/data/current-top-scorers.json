@@ -6,7 +6,7 @@
     "matchdayNumber": "2"
   },
   "background": {
-    "image": "../figma_match_card/assets/backgrounds/generic.webp"
+    "image": "./assets/bg.webp"
   },
   "leaders": [
     {
