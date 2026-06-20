@@ -95,6 +95,7 @@ body {
   gap: 15px;
   text-align: center;
   text-transform: uppercase;
+  text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
 }
 
 .tournament {
@@ -118,10 +119,10 @@ body {
 .card-header h1 {
   margin: 0;
   height: 60px;
-  font-family: "Metropolis", "Arial Black", Impact, sans-serif;
+  font-family: "Resolve BoldWd", "Arial Black", Impact, sans-serif;
   font-size: 60px;
   font-style: italic;
-  font-weight: 900;
+  font-weight: 950;
   line-height: 60px;
   letter-spacing: 3px;
   mix-blend-mode: difference;
