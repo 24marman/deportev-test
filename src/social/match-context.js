@@ -488,7 +488,7 @@ function isAbsoluteNarrativeCandidate(candidate) {
 
 function getEditorialSelectionSpread(topPriority) {
   if (topPriority >= 110) return 0;
-  if (topPriority >= 95) return 3;
+  if (topPriority >= 95) return 0;
   if (topPriority >= 85) return 5;
   return 6;
 }
@@ -1518,6 +1518,18 @@ function pushGroupStakesCandidates(candidates, context) {
         text: `${loserName} queda bajo presión en el Grupo ${group} y necesita reaccionar en la última jornada.`,
       });
     }
+
+    if (Number(loserAfter.points || 0) === 0 && loserOutlook?.remainingGames > 0) {
+      const winnerFirstWin = Number(winnerAfter.wins || 0) === 1;
+      candidates.push({
+        priority: 96,
+        source: "editorial-group-stakes",
+        signature: "matchday-two-loser-best-third-route",
+        text: winnerFirstWin
+          ? `${winnerName} consiguió su primera victoria y deja a ${loserName} obligado a ganar para aspirar a avanzar como uno de los mejores terceros.`
+          : `${winnerName} venció a ${loserName}, que queda obligado a ganar para aspirar a avanzar como uno de los mejores terceros.`,
+      });
+    }
   }
 
   if (isDraw && matchday === 2) {
@@ -1728,7 +1740,7 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
       source: "editorial-group-qualification",
       signature: "loser-misses-top-two",
       text: loserOutlook.thirdPlacePending
-        ? `${loserName} queda fuera de los dos primeros puestos y dependerá de la tabla de terceros.`
+        ? `${loserName} queda fuera de los dos primeros puestos y a la espera de la tabla de mejores terceros.`
         : `${loserName} queda fuera de los dos primeros puestos del grupo.`,
     });
     return;
@@ -1739,7 +1751,7 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
       priority: 90,
       source: "editorial-group-qualification",
       signature: "loser-no-longer-controls-top-two",
-      text: `${loserName} queda contra la pared y necesita ganar en la última jornada para seguir con vida.`,
+      text: `${loserName} queda al límite y necesita ganar para aspirar a avanzar como uno de los mejores terceros.`,
     });
   }
 }

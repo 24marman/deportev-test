@@ -249,7 +249,7 @@ const brazilHaitiMatchdayTwo = baseMatch({
 runCase({
   name: "third-place route avoids premature elimination angle",
   matchData: brazilHaitiMatchdayTwo,
-  expectIncludes: ["Brasil", "primera victoria"],
+  expectIncludes: ["Brasil", "primera victoria", "mejores terceros"],
 });
 
 runNegativeCase({

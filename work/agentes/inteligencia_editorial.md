@@ -123,6 +123,14 @@ Ejemplos:
 
 Nota 2026: quedar fuera de los dos primeros lugares no equivale automaticamente a eliminacion, porque tambien avanzan ocho mejores terceros. Si una seleccion aun puede terminar tercera, usar lenguaje tipo `queda contra la pared`, `necesita ganar y esperar`, o `dependera de la tabla de terceros`; no escribir `eliminada`.
 
+Ejemplo recomendado en Jornada 2:
+
+- `Brasil consiguio su primera victoria y deja a Haiti obligado a ganar para aspirar a avanzar como uno de los mejores terceros.`
+
+Ejemplo recomendado al cierre del grupo:
+
+- `Haiti queda fuera de los dos primeros puestos y a la espera de la tabla de mejores terceros.`
+
 ### Nivel 2: consecuencia fuerte de tabla
 
 Compite con otros angulos fuertes, pero tiene preferencia sobre analisis tactico comun. Puede ser desplazado por un Nivel 1 o por un hecho de partido extraordinario si la consecuencia no es definitiva.
