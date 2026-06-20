@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tabla de Goleo - Mundial 2026</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section id="match-card" class="top-scorers-card" aria-label="Tabla de goleo Mundial 2026">
+        <img
+          class="stadium-bg"
+          src="../figma_match_card/assets/backgrounds/generic.webp"
+          alt=""
+          data-bind-asset="background.image"
+        />
+
+        <header class="card-header">
+          <p class="tournament">COPA MUNDIAL <strong>2026</strong></p>
+          <h1 data-bind="competition.phase">TABLA DE GOLEO</h1>
+          <div class="subtitle">
+            <img src="../figma_match_card/assets/subtitle-left.svg" alt="" />
+            <p>JORNADA <strong data-bind="competition.matchdayNumber">1</strong></p>
+            <img class="subtitle-right" src="../figma_match_card/assets/subtitle-left.svg" alt="" />
+          </div>
+        </header>
+
+        <div class="leaderboard" data-leaderboard></div>
+
+        <img class="deportev-logo" src="../figma_match_card/assets/deportev-logo.svg" alt="Deportev" />
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

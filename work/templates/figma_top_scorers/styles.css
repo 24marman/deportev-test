@@ -1,0 +1,332 @@
+:root {
+  --green: #059946;
+  --white: #f5f3f4;
+  --canvas-width: 1080px;
+  --canvas-height: 1350px;
+}
+
+@font-face {
+  font-family: "Resolve RegularWd";
+  src: url("../figma_match_card/assets/fonts/Resolve-RegularWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve SemiboldWd";
+  src: url("../figma_match_card/assets/fonts/Resolve-SemiboldWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve BoldWd";
+  src: url("../figma_match_card/assets/fonts/Resolve-BoldWd.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Resolve BoldCn";
+  src: url("../figma_match_card/assets/fonts/Resolve-BoldCn.otf") format("opentype");
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #0b0d0c;
+  color: var(--white);
+  font-family: "Resolve BoldWd", "Arial Black", Impact, system-ui, sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.top-scorers-card {
+  position: relative;
+  width: var(--canvas-width);
+  height: var(--canvas-height);
+  overflow: hidden;
+  isolation: isolate;
+  background: #050505;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.stadium-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 1080px;
+  height: 1350px;
+  object-fit: cover;
+}
+
+.top-scorers-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 7% 3%, rgba(255, 255, 255, 0.28), transparent 8%),
+    radial-gradient(circle at 93% 3%, rgba(255, 255, 255, 0.28), transparent 8%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.25));
+  mix-blend-mode: screen;
+}
+
+.card-header {
+  position: absolute;
+  top: 135px;
+  left: 50px;
+  z-index: 5;
+  width: 980px;
+  height: 146px;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.tournament {
+  margin: 0;
+  font-family: "Resolve BoldWd", "Arial Black", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 7.2px;
+  mix-blend-mode: difference;
+}
+
+.tournament strong {
+  color: var(--green);
+}
+
+.card-header h1 {
+  margin: 19px 0 27px;
+  font-family: "Resolve BoldWd", "Arial Black", Impact, sans-serif;
+  font-size: 60px;
+  font-style: italic;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 3px;
+  transform: skewX(-8deg);
+  mix-blend-mode: difference;
+}
+
+.subtitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  min-height: 30px;
+}
+
+.subtitle img {
+  width: 100px;
+  height: 6px;
+  object-fit: fill;
+  mix-blend-mode: difference;
+}
+
+.subtitle-right {
+  transform: rotate(180deg) scaleY(-1);
+}
+
+.subtitle p {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 7.2px;
+  white-space: nowrap;
+  mix-blend-mode: difference;
+}
+
+.subtitle strong {
+  color: var(--green);
+}
+
+.leaderboard {
+  position: absolute;
+  top: 303px;
+  left: 50px;
+  z-index: 5;
+  width: 980px;
+}
+
+.leader-row {
+  position: relative;
+  width: 980px;
+  height: 162px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-transform: uppercase;
+}
+
+.leader-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(160, 160, 160, 0.72), rgba(78, 78, 78, 0.55) 40%, rgba(17, 17, 17, 0.72)),
+    radial-gradient(circle at 48% 45%, rgba(255, 255, 255, 0.25), transparent 28%);
+  opacity: 0.82;
+  mix-blend-mode: color-dodge;
+}
+
+.leader-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1px 4px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.22), rgba(5, 153, 70, 0.1) 55%, rgba(5, 153, 70, 0.42));
+  opacity: 0.45;
+  mix-blend-mode: soft-light;
+}
+
+.leader-row.is-first .leader-green {
+  opacity: 0.72;
+}
+
+.leader-green {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, transparent 0%, rgba(5, 153, 70, 0.15) 34%, rgba(5, 153, 70, 0.9) 100%);
+  opacity: 0;
+  mix-blend-mode: soft-light;
+}
+
+.flag-frame {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 4;
+  width: 126px;
+  height: 126px;
+  display: grid;
+  place-items: center;
+}
+
+.flag-frame::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 7px solid var(--green);
+  border-radius: 50%;
+  mix-blend-mode: difference;
+}
+
+.leader-flag {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #d9d9d9;
+  filter: contrast(1.05) saturate(1.1);
+}
+
+.leader-copy {
+  position: absolute;
+  top: 20px;
+  left: 184px;
+  z-index: 5;
+  width: 634px;
+  height: 114px;
+}
+
+.leader-name {
+  margin: 0;
+  width: 100%;
+  overflow: hidden;
+  color: var(--white);
+  font-size: 60px;
+  font-weight: 950;
+  line-height: 1.15;
+  letter-spacing: 3px;
+  text-overflow: clip;
+  white-space: nowrap;
+  mix-blend-mode: difference;
+}
+
+.leader-country {
+  margin: 7px 0 0;
+  width: 100%;
+  overflow: hidden;
+  color: var(--green);
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1.15;
+  letter-spacing: 1.5px;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.leader-portrait-wrap {
+  position: absolute;
+  top: 0;
+  left: 518px;
+  z-index: 3;
+  width: 300px;
+  height: 162px;
+  overflow: hidden;
+  display: grid;
+  place-items: end center;
+}
+
+.leader-portrait {
+  width: 300px;
+  height: 210px;
+  object-fit: cover;
+  object-position: center top;
+  filter: grayscale(1) contrast(1.35) brightness(1.08);
+  mix-blend-mode: screen;
+}
+
+.leader-portrait-fallback {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 58% 38%, rgba(245, 243, 244, 0.78) 0 13%, transparent 14%),
+    radial-gradient(ellipse at 58% 88%, rgba(245, 243, 244, 0.52) 0 32%, transparent 33%),
+    linear-gradient(120deg, transparent 0 34%, rgba(245, 243, 244, 0.18) 35% 61%, transparent 62%);
+  filter: grayscale(1) contrast(1.45);
+  opacity: 0.72;
+  mix-blend-mode: screen;
+}
+
+.leader-score {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 6;
+  width: 162px;
+  height: 162px;
+  display: grid;
+  place-items: center;
+  color: var(--green);
+  font-family: "Resolve BoldWd", "Arial Black", Impact, sans-serif;
+  font-size: 150px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.deportev-logo {
+  position: absolute;
+  left: 440px;
+  top: 1175px;
+  z-index: 6;
+  width: 200px;
+  height: 40px;
+  object-fit: contain;
+}

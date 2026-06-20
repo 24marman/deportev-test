@@ -1,0 +1,63 @@
+{
+  "competition": {
+    "name": "COPA MUNDIAL",
+    "year": "2026",
+    "phase": "TABLA DE GOLEO",
+    "matchdayNumber": "2"
+  },
+  "background": {
+    "image": "../figma_match_card/assets/backgrounds/generic.webp"
+  },
+  "leaders": [
+    {
+      "name": "MESSI",
+      "fullName": "Lionel Messi",
+      "country": "ARGENTINA",
+      "providerCountry": "Argentina",
+      "goals": 4,
+      "flag": "../figma_match_card/assets/flags/ar.svg",
+      "portrait": null,
+      "portraitStatus": "pending"
+    },
+    {
+      "name": "MBAPPÉ",
+      "fullName": "Kylian Mbappe",
+      "country": "FRANCIA",
+      "providerCountry": "France",
+      "goals": 3,
+      "flag": "../figma_match_card/assets/flags/fr.svg",
+      "portrait": null,
+      "portraitStatus": "pending"
+    },
+    {
+      "name": "VINÍCIUS JR.",
+      "fullName": "Vinicius Junior",
+      "country": "BRASIL",
+      "providerCountry": "Brazil",
+      "goals": 3,
+      "flag": "../figma_match_card/assets/flags/br.svg",
+      "portrait": null,
+      "portraitStatus": "pending"
+    },
+    {
+      "name": "MORATA",
+      "fullName": "Alvaro Morata",
+      "country": "ESPAÑA",
+      "providerCountry": "Spain",
+      "goals": 2,
+      "flag": "../figma_match_card/assets/flags/es.svg",
+      "portrait": null,
+      "portraitStatus": "pending"
+    },
+    {
+      "name": "PULISIC",
+      "fullName": "Christian Pulisic",
+      "country": "ESTADOS UNIDOS",
+      "providerCountry": "USA",
+      "goals": 2,
+      "flag": "../figma_match_card/assets/flags/us.svg",
+      "portrait": null,
+      "portraitStatus": "pending"
+    }
+  ]
+}

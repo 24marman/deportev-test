@@ -20,6 +20,7 @@ const {
 const { buildEditorialSignalsForMatchData, summarizeEditorialSignals } = require("./social/editorial-signals");
 const { runEditorialResearch, shouldRunEditorialResearch } = require("./social/editorial-research");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
+const { maybeProcessTopScorers } = require("./top-scorers/top-scorers-job");
 const bsd = require("../work/tools/bsd_match_adapter");
 
 const generatedDir = path.join("outputs", "generated");
@@ -532,6 +533,7 @@ async function tickMonitor() {
     state = await processFinishedEvent(event, state, contextEvents);
   }
 
+  state = await maybeProcessTopScorers(state, contextEvents);
   await saveMonitorState(state);
 }
 

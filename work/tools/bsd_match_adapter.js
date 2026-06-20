@@ -357,6 +357,36 @@ async function fetchEvent(eventId) {
   return requestJson(`/events/${eventId}/`, token);
 }
 
+async function fetchEventIncidents(eventId) {
+  const token = process.env.BSD_API_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing BSD_API_TOKEN environment variable.");
+  }
+
+  return requestJson(`/events/${eventId}/incidents/`, token);
+}
+
+async function fetchPlayer(playerId) {
+  const token = process.env.BSD_API_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing BSD_API_TOKEN environment variable.");
+  }
+
+  return requestJson(`/players/${playerId}/`, token);
+}
+
+async function fetchWorldCupSquad(teamId) {
+  const token = process.env.BSD_API_TOKEN;
+
+  if (!token) {
+    throw new Error("Missing BSD_API_TOKEN environment variable.");
+  }
+
+  return requestJson(`/worldcup/squads/${teamId}/`, token);
+}
+
 function extractEvents(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.results)) return payload.results;
@@ -414,9 +444,12 @@ module.exports = {
   WORLD_CUP,
   requestJson,
   fetchEvent,
+  fetchEventIncidents,
   fetchEvents,
   fetchLiveEvents,
   fetchMatchData,
+  fetchPlayer,
+  fetchWorldCupSquad,
   toMatchData,
   getVenueName,
   getVenueBackground,
