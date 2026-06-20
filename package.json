@@ -11,6 +11,12 @@
     "preview:tweet": "node src/social/preview-tweet.js",
     "render:demo": "node src/render-match-card.js --data work/templates/figma_match_card/data/current-match.json --out outputs/generated/demo.webp",
     "render:top-scorers": "node src/top-scorers/render-top-scorers.js --data work/templates/figma_top_scorers/data/current-top-scorers.json --out outputs/generated/top-scorers-demo.webp",
+    "portrait:prompt": "node work/tools/portrait_lab.js --mode prompt",
+    "portrait:preserve": "node work/tools/portrait_lab.js --mode preserve",
+    "portrait:ai": "node work/tools/portrait_lab.js --mode all",
+    "portrait:finalize": "node work/tools/portrait_lab.js --mode finalize",
+    "fotmob:player-image": "node work/tools/fotmob_player_image.js",
+    "guardian:player-image": "node work/tools/guardian_player_image.js",
     "bsd:match": "node work/tools/bsd_match_adapter.js"
   },
   "dependencies": {
