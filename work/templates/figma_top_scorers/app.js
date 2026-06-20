@@ -134,6 +134,9 @@ function renderTopScorersCard(data = topScorersData) {
 
   setTextBindings(root, data);
   setAssetBindings(root, data);
+  if (data.background?.image) {
+    root.style.setProperty("--card-bg-image", `url("${data.background.image}")`);
+  }
   leaderboard.innerHTML = "";
   leaders.forEach((leader, index) => leaderboard.append(createLeaderRow(leader, index)));
   fitLeaderText(root);
