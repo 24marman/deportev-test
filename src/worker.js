@@ -17,6 +17,7 @@ const {
   shouldWarmEditorialContext,
   warmEditorialContext,
 } = require("./social/editorial-context-cache");
+const { buildEditorialSignalsForMatchData, summarizeEditorialSignals } = require("./social/editorial-signals");
 const { runEditorialResearch, shouldRunEditorialResearch } = require("./social/editorial-research");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const bsd = require("../work/tools/bsd_match_adapter");
@@ -63,6 +64,10 @@ async function renderEvent(eventId, options = {}) {
 
   const contextStartedAt = nowMs();
   await enrichCompetitionContext(matchData, options.contextEvents);
+  applyEditorialSignals(matchData, {
+    record: options.warmedRecord,
+    newsDigest: options.newsDigest,
+  });
   logDuration(`Context enrichment for BSD event ${eventId}`, contextStartedAt);
 
   const outputName = getOutputName(matchData);
@@ -129,6 +134,31 @@ async function renderEvent(eventId, options = {}) {
     uploadResult,
     socialResult,
   };
+}
+
+function applyEditorialSignals(matchData, { record, newsDigest } = {}) {
+  try {
+    const signals = buildEditorialSignalsForMatchData(matchData, {
+      newsDigest,
+      researchProfile: record?.editorialResearchProfile || null,
+    });
+
+    matchData.context = {
+      ...(matchData.context || {}),
+      editorialSignals: signals,
+    };
+
+    const summary = summarizeEditorialSignals(signals);
+    if (summary) {
+      console.log(
+        `Editorial signals for BSD event ${matchData.source?.eventId || "unknown"}: ` +
+          `news=${summary.newsItemCount}, favoriteGap=${summary.favoriteGap}, ` +
+          `debutantVsFavorite=${summary.debutantVsFavorite}.`,
+      );
+    }
+  } catch (error) {
+    console.error(`Editorial signals unavailable: ${error.message}`);
+  }
 }
 
 async function enrichCompetitionContext(matchData, contextEvents) {
@@ -321,6 +351,7 @@ async function processFinishedEvent(event, state, contextEvents) {
   const result = await renderEvent(eventId, {
     contextEvents,
     warmedRecord: state.matches[eventId],
+    newsDigest: state.editorialResearch?.newsDigest || null,
     recentEditorialSignatures: getRecentEditorialSignatures(state, eventId),
   });
 
@@ -334,6 +365,8 @@ async function processFinishedEvent(event, state, contextEvents) {
     editorialHeadline: result.socialResult?.editorialContext?.headline || null,
     editorialSource: result.socialResult?.editorialContext?.source || null,
     editorialSignature: result.socialResult?.editorialContext?.signature || null,
+    editorialDecision: result.socialResult?.editorialContext?.decision || null,
+    editorialSignalSummary: result.socialResult?.editorialContext?.signalSummary || null,
     xPostMode: result.socialResult?.mode || null,
     xPublished: Boolean(result.socialResult?.published),
   };

@@ -12,7 +12,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 - Contexto del dia calculado con todos los partidos de fase de grupos ya finalizados.
 - Forma reciente por seleccion dentro del grupo: victorias, empates o derrotas consecutivas.
 - Base curada local `src/data/world-cup-team-facts.json` para hitos historicos verificables.
-- Fuentes editoriales configurables en `EDITORIAL_RESEARCH_SOURCES`: RSS/XML y paginas HTML de medios deportivos. Se guardan como digest previo, no como verdad final del marcador.
+- Fuentes editoriales configurables en `EDITORIAL_RESEARCH_SOURCES`: RSS/XML y paginas HTML de medios deportivos. Se convierten en senales suaves de contexto, no en fuente principal ni en verdad final del marcador.
 
 ## Flujo ideal sin perder velocidad
 
@@ -21,6 +21,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
    - Revisar partidos futuros y en vivo dentro de `EDITORIAL_RESEARCH_LOOKAHEAD_HOURS`.
    - Preparar memoria editorial por partido: jerarquia de selecciones, condicion de campeon vigente, debutantes, grupo, jornada, sede, historial curado y posibles consecuencias.
    - Si `EDITORIAL_RESEARCH_SOURCES` tiene fuentes RSS/XML o paginas HTML configuradas, guardar un digest de titulares/notas recientes para enriquecer la lectura previa sin frenar el post final.
+   - Traducir ese digest en `editorialSignals`: temas como favorito, debut, presion, clasificacion, dominio, sorpresa o gol tardio. Estas senales solo suben prioridad a angulos que ya existen por datos reales.
    - Filtrar titulares con `EDITORIAL_RESEARCH_KEYWORDS` para priorizar Mundial, futbol y selecciones, evitando ruido de otros deportes.
    - Guardar esa memoria en `monitor-state.json` y en Supabase Storage para que funcione aunque la computadora local este apagada.
    - No publicar, no renderizar y no llamar a X en esta fase.
@@ -44,7 +45,7 @@ Crear textos para X con criterio de marketing deportivo, usando contexto real de
 - Estado del grupo: calculado internamente con resultados previos del mismo calendario.
 - Estado global del torneo: calculado internamente con todos los grupos para detectar primer clasificado, clasificaciones nuevas y lideratos asegurados.
 - Hitos historicos estables: base curada local versionada.
-- Internet/noticias: solo debe usarse como proceso de investigacion previo o de mantenimiento de la base curada, no en el momento final del post.
+- Internet/noticias: solo debe usarse como investigacion previa y senal contextual. No crea clasificaciones, records, lesiones ni claims competitivos si la data estructurada no los confirma.
 
 ## Por que no buscar internet al final
 
@@ -70,7 +71,7 @@ Buscar en internet al silbatazo final agrega latencia, puede fallar, y puede mez
 - Leer el contexto completo del dia: si varios partidos terminan empatados o todos los partidos del dia fueron empate, usarlo como angulo editorial cuando sea mas relevante que una frase generica.
 - Integrar el grupo o jornada solo si aporta contexto natural.
 - No incluir lineas fijas tipo `FINAL | Grupo E | Jornada 1`.
-- No inventar records ni clasificaciones si la data no los sostiene.
+- No inventar records ni clasificaciones si la data no los sostiene. Una noticia puede sugerir que el tema importa, pero solo la tabla calculada, el API o la base curada pueden confirmar el hecho.
 - Escribir corto: una linea como objetivo, dos maximo si el contexto lo justifica. Evitar frases largas con demasiadas ideas.
 - Nombrar el contexto especifico: rival, favorito, debutante, grupo, momento del gol, consecuencia o duda que deja el resultado. No usar frases comodin tipo "senal de caracter" si no agregan una lectura unica.
 - Mantener intensidad proporcional: partidos normales se describen sobrios; hechos excepcionales solo se destacan si la data lo justifica.
@@ -208,6 +209,15 @@ Un RAG puede ser util para la version avanzada, pero no debe bloquear el post fi
 - Al final: no buscar desde cero; solo elegir la mejor narrativa con datos ya preparados.
 
 La capa rapida obligatoria vive en codigo y base curada local, porque esa es la que garantiza velocidad y evita inventar.
+
+## Senales Editoriales De Noticias
+
+Las noticias no son la fuente principal del tweet. Funcionan como senales de apoyo:
+
+- Si varios titulares hablan de favorito, debut o presion, el motor puede subir algunos puntos a candidatos de jerarquia o contexto de grupo.
+- Si hay titulares de dominio, xG o ocasiones, el motor puede favorecer una lectura estadistica, pero solo si BSD confirma el dominio con datos.
+- Si hay titulares de clasificacion, el motor puede prestar mas atencion a la tabla, pero nunca afirmar una clasificacion si `buildTournamentContext` o `buildPriorGroupContext` no la confirma.
+- Las senales quedan guardadas en `editorialSignalSummary` y la decision final en `editorialDecision` para auditoria.
 
 ## Bot guru futbolistico
 

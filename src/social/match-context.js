@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeTeamName } = require("./caption");
 const { normalizeTeamKey } = require("../lib/team-metadata");
+const { summarizeEditorialSignals } = require("./editorial-signals");
 
 const FACTS_PATH = path.join(__dirname, "..", "data", "world-cup-team-facts.json");
 
@@ -34,6 +35,7 @@ function getInternalContext(matchData, options = {}) {
     facts.sort((a, b) => b.priority - a.priority);
   }
 
+  const signalSummary = summarizeEditorialSignals(matchData.context?.editorialSignals);
   const rankedFacts = rankCandidatesForRecentUsage(facts, options.recentEditorialSignatures);
   const picked = pickHeadlineCandidate(rankedFacts, matchData);
 
@@ -42,6 +44,8 @@ function getInternalContext(matchData, options = {}) {
     headline: picked?.text || "",
     signature: picked?.signature || getEditorialSignature(picked?.text),
     facts: rankedFacts,
+    signalSummary,
+    decision: buildEditorialDecisionAudit(picked, rankedFacts, signalSummary),
   };
 }
 
@@ -352,13 +356,15 @@ function buildFactCandidates(matchData) {
       : `${winnerName} venció a ${loserName} y toma impulso en el grupo.`,
   });
 
-  return candidates
+  return applyEditorialSignalBoosts(
+    candidates
     .filter((candidate) => candidate.text)
     .map((candidate) => ({
       ...candidate,
       text: polishEditorialText(candidate.text),
-    }))
-    .sort((a, b) => b.priority - a.priority);
+    })),
+    matchData.context?.editorialSignals,
+  ).sort((a, b) => b.priority - a.priority);
 }
 
 function pickHeadline(candidates, matchData) {
@@ -423,6 +429,115 @@ function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []
       if (b.level === 1 && a.level !== 1) return 1;
       return b.priority - a.priority;
     });
+}
+
+function applyEditorialSignalBoosts(candidates, signals) {
+  if (!signals) return candidates;
+
+  return candidates.map((candidate) => {
+    const signal = getEditorialSignalBoost(candidate, signals);
+    const basePriority = Number(candidate.priority || 0);
+
+    return {
+      ...candidate,
+      basePriority,
+      priority: basePriority + signal.boost,
+      editorialSignalBoost: signal.boost,
+      editorialSignalReasons: signal.reasons,
+    };
+  });
+}
+
+function getEditorialSignalBoost(candidate, signals) {
+  const source = String(candidate?.source || "");
+  const signature = String(candidate?.signature || "");
+  const level = Number(candidate?.level || getCandidateNarrativeLevel(candidate));
+  const reasons = [];
+  let boost = 0;
+
+  if (level === 1) {
+    return { boost: 0, reasons };
+  }
+
+  function add(value, reason) {
+    boost += value;
+    reasons.push(reason);
+  }
+
+  if (hasNewsTheme(signals, "qualification") || hasNewsTheme(signals, "pressure")) {
+    if (source.includes("group") || source.includes("qualification") || source.includes("tournament")) {
+      add(6, "research-confirms-table-stakes");
+    }
+  }
+
+  if (signals.matchup?.defendingChampionSide && source.includes("defending-champion")) {
+    add(5, "research-confirms-defending-champion");
+  }
+
+  if (signals.matchup?.debutantVsFavorite && (source.includes("hierarchy") || source.includes("stats-dominance") || source.includes("chance-quality"))) {
+    add(5, "research-confirms-debutant-vs-favorite");
+  }
+
+  if (hasNewsTheme(signals, "favorite") && source.includes("hierarchy")) {
+    add(3, "research-confirms-team-hierarchy");
+  }
+
+  if (hasNewsTheme(signals, "upset") && source.includes("hierarchy")) {
+    add(3, "research-confirms-upset-angle");
+  }
+
+  if (hasNewsTheme(signals, "dominance") && (source.includes("stats") || source.includes("advanced-stats"))) {
+    add(3, "research-confirms-stat-angle");
+  }
+
+  if (hasNewsTheme(signals, "late") && (source.includes("late") || signature.includes("late"))) {
+    add(3, "research-confirms-late-game-angle");
+  }
+
+  if (source === "bsd-match-stats") {
+    boost = Math.min(boost, 3);
+  }
+
+  return {
+    boost: Math.min(boost, 8),
+    reasons: reasons.slice(0, 3),
+  };
+}
+
+function hasNewsTheme(signals, theme) {
+  if (!signals) return false;
+  if (Number(signals.news?.themes?.[theme] || 0) > 0) return true;
+
+  return ["home", "away"].some((side) => Number(signals.teams?.[side]?.newsThemeCounts?.[theme] || 0) > 0);
+}
+
+function buildEditorialDecisionAudit(picked, rankedFacts, signalSummary) {
+  return {
+    picked: picked
+      ? {
+          source: picked.source,
+          signature: picked.signature || getEditorialSignature(picked.text),
+          priority: picked.priority,
+          basePriority: picked.basePriority ?? picked.originalPriority ?? picked.priority,
+          level: picked.level || getCandidateNarrativeLevel(picked),
+          editorialSignalBoost: picked.editorialSignalBoost || 0,
+          editorialSignalReasons: picked.editorialSignalReasons || [],
+          text: picked.text,
+        }
+      : null,
+    signalSummary,
+    topCandidates: (rankedFacts || []).slice(0, 7).map((candidate) => ({
+      source: candidate.source,
+      signature: candidate.signature || getEditorialSignature(candidate.text),
+      priority: candidate.priority,
+      basePriority: candidate.basePriority ?? candidate.originalPriority ?? candidate.priority,
+      level: candidate.level || getCandidateNarrativeLevel(candidate),
+      editorialSignalBoost: candidate.editorialSignalBoost || 0,
+      editorialSignalReasons: candidate.editorialSignalReasons || [],
+      repeatPenalty: candidate.repeatPenalty || 0,
+      text: candidate.text,
+    })),
+  };
 }
 
 function getCandidateNarrativeLevel(candidate) {

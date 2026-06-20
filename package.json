@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/worker.js",
     "dev": "node src/server.js",
+    "test:editorial": "node work/tools/editorial_smoke_tests.js",
     "preview:tweet": "node src/social/preview-tweet.js",
     "render:demo": "node src/render-match-card.js --data work/templates/figma_match_card/data/current-match.json --out outputs/generated/demo.webp",
     "bsd:match": "node work/tools/bsd_match_adapter.js"

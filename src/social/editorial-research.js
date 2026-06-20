@@ -2,6 +2,7 @@ const https = require("https");
 const { findScheduledGroupStageMatch } = require("../lib/world-cup-group-stage-schedule");
 const { getDisplayTeamName, normalizeTeamKey } = require("../lib/team-metadata");
 const { warmEditorialContext } = require("./editorial-context-cache");
+const { buildEditorialSignalsForEvent } = require("./editorial-signals");
 const teamFacts = require("../data/world-cup-team-facts.json");
 
 const FINISHED_STATUSES = new Set(["finished", "final", "cancelled", "postponed"]);
@@ -272,13 +273,14 @@ function getTeamFacts(name) {
   return teamFacts[normalizeTeamKey(name)] || {};
 }
 
-function buildPrematchProfile(event, scheduledMatch) {
+function buildPrematchProfile(event, scheduledMatch, newsDigest) {
   const providerHomeTeam = event.home_team || scheduledMatch.home;
   const providerAwayTeam = event.away_team || scheduledMatch.away;
   const homeTeam = getDisplayTeamName(providerHomeTeam);
   const awayTeam = getDisplayTeamName(providerAwayTeam);
   const homeFacts = getTeamFacts(providerHomeTeam);
   const awayFacts = getTeamFacts(providerAwayTeam);
+  const editorialSignals = buildEditorialSignalsForEvent(event, scheduledMatch, newsDigest);
 
   return {
     researchedAt: new Date().toISOString(),
@@ -308,6 +310,7 @@ function buildPrematchProfile(event, scheduledMatch) {
       },
     },
     notes: buildPrematchNotes(homeTeam, awayTeam, homeFacts, awayFacts, scheduledMatch),
+    editorialSignals,
   };
 }
 
@@ -334,7 +337,9 @@ function buildPrematchNotes(homeTeam, awayTeam, homeFacts, awayFacts, scheduledM
   return notes;
 }
 
-function buildResearchRecord(event, scheduledMatch, warmed, previousRecord) {
+function buildResearchRecord(event, scheduledMatch, warmed, previousRecord, newsDigest) {
+  const editorialSignals = buildEditorialSignalsForEvent(event, scheduledMatch, newsDigest);
+
   return {
     ...previousRecord,
     eventId: String(event.id),
@@ -353,11 +358,12 @@ function buildResearchRecord(event, scheduledMatch, warmed, previousRecord) {
     editorialContext: warmed.context,
     editorialCandidateCount: warmed.context?.facts?.length || 0,
     editorialResearchSummary: compactFacts(warmed.context),
+    editorialSignals,
   };
 }
 
-function buildPrematchResearchRecord(event, scheduledMatch, previousRecord) {
-  const profile = buildPrematchProfile(event, scheduledMatch);
+function buildPrematchResearchRecord(event, scheduledMatch, previousRecord, newsDigest) {
+  const profile = buildPrematchProfile(event, scheduledMatch, newsDigest);
 
   return {
     ...previousRecord,
@@ -377,6 +383,7 @@ function buildPrematchResearchRecord(event, scheduledMatch, previousRecord) {
       source: profile.source,
       text,
     })),
+    editorialSignals: profile.editorialSignals,
   };
 }
 
@@ -429,7 +436,7 @@ async function runEditorialResearch({ state, events, contextEvents, fetchMatchDa
       const status = String(event.status || "").toLowerCase();
 
       if (!WARM_CONTEXT_STATUSES.has(status)) {
-        nextState.matches[eventId] = buildPrematchResearchRecord(event, scheduledMatch, previousRecord);
+        nextState.matches[eventId] = buildPrematchResearchRecord(event, scheduledMatch, previousRecord, newsDigest);
         summary.researchedCount += 1;
         console.log(`Editorial research profiled BSD event ${eventId} before live data.`);
         continue;
@@ -441,7 +448,7 @@ async function runEditorialResearch({ state, events, contextEvents, fetchMatchDa
         contextEvents: contextEvents || events,
       });
 
-      nextState.matches[eventId] = buildResearchRecord(event, scheduledMatch, warmed, previousRecord);
+      nextState.matches[eventId] = buildResearchRecord(event, scheduledMatch, warmed, previousRecord, newsDigest);
       summary.researchedCount += 1;
       console.log(
         `Editorial research warmed BSD event ${eventId} in ${warmed.elapsedMs}ms ` +
