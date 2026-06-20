@@ -8,9 +8,9 @@ Este agente no arma el diseño completo. Su responsabilidad es entregar un asset
 
 ## Objetivo
 
-Mantener una biblioteca persistente de retratos aprobados por jugador, con consistencia visual, buena identificación del rostro y carga rápida en producción.
+Mantener una biblioteca persistente de retratos generados por IA y aprobados por jugador, con consistencia visual, buena identificación del rostro, fondo removido y carga rápida en producción.
 
-La regla clave es: la IA puede ayudar a crear la versión estilizada una vez, pero el render automático de un post debe reutilizar el asset aprobado. No debe depender de una generación nueva en el momento de publicar.
+La regla clave es: la IA genera el retrato una vez, se aprueba, se guarda y el render automático reutiliza el asset aprobado. El bot no debe generar rostros en caliente al momento de publicar.
 
 ## Flujo
 
@@ -19,49 +19,51 @@ La regla clave es: la IA puede ayudar a crear la versión estilizada una vez, pe
 3. Busca si ya existe `approved-hero.webp` en Supabase Storage.
 4. Si existe, lo devuelve inmediatamente.
 5. Si no existe, crea o actualiza `manifest.json` con estado `pending`.
-6. Construye una lista de posibles fuentes visuales.
-7. Prioriza fuentes oficiales o controladas: FIFA, federación, club, API contratada, asset entregado manualmente o banco autorizado.
-8. Elige la mejor foto fuente con estos criterios:
-   - rostro visible y reconocible,
-   - buena resolución,
-   - iluminación suficiente,
-   - ángulo frontal o tres cuartos,
-   - cuello visible,
-   - mínimo de jersey/hombros,
-   - composición suficientemente cerrada para llenar el alto del rectángulo,
-   - sin manos, logos grandes u objetos tapando la cara.
-9. Detecta rostro y recorta con perfil `face-neck-tight`.
-10. Orienta la imagen hacia el look del template:
-    - si el jugador ya mira hacia la izquierda, se conserva;
-    - si mira hacia la derecha, se permite espejo horizontal para composición, porque la playera no debe ser protagonista;
-    - si el espejo hace que el rostro se vea raro, se conserva la orientación original.
-11. Procesa la imagen al estilo aprobado:
+6. Investiga referencias visuales actuales solo para construir un perfil del jugador:
+   - peinado actual,
+   - barba/bigote,
+   - edad visual,
+   - rasgos reconocibles,
+   - expresión probable,
+   - look de selección o torneo.
+7. No modifica directamente la foto encontrada en internet. La referencia sirve para entender cómo se ve el jugador, no como asset final.
+8. Genera un retrato nuevo con IA usando el perfil visual del jugador y, si existe, referencias aprobadas por el proyecto.
+9. La generación debe pedir:
     - blanco y negro,
     - alto contraste,
     - grano/grunge,
     - textura editorial,
-    - fondo limpio o transparente si el template lo requiere,
-    - identidad y rasgos reconocibles.
+    - rostro y cuello dominantes,
+    - muy poco hombro,
+    - mirada/orientación hacia la izquierda cuando funcione,
+    - fondo plano removible o transparencia nativa,
+    - sin logos, texto, escudos inventados ni playera protagonista.
+10. Remueve el fondo y guarda una salida con alpha.
+11. Ajusta el asset al contrato del template: retrato alto, cara/cuello, sin aire vertical.
 12. Genera preview para aprobación.
 13. Una vez aprobado, guarda `approved-hero.webp`.
 14. El render de producción reutiliza ese WebP sin volver a buscar ni generar.
 
 ## Uso de IA
 
-La IA debe usarse como una etapa de estilización y refinamiento, no como sustituto libre de la identidad del jugador.
+La IA es la fuente del retrato final. Internet solo se usa para scouting visual, salvo que el proyecto entregue una referencia aprobada.
 
 Prompt base operativo:
 
 ```text
-Convert this player portrait into a black-and-white editorial grunge sports portrait.
-Preserve the player's facial identity, proportions, expression, and recognizable features.
-Use a tight crop focused on face and neck, with minimal shoulders and no visible jersey emphasis.
-High contrast, textured grain, desaturated, dramatic but realistic.
-Face should fit the approved template framing and look slightly turned toward the left when possible.
-Do not invent logos, text, accessories, tattoos, badges, or facial features.
+Generate an original black-and-white editorial grunge sports portrait of {playerName}
+based on current visual references: {hair}, {beard}, {ageVisual}, {faceTraits}.
+Close crop on face and neck, minimal shoulders, no jersey emphasis.
+The portrait should feel like a modern football tournament graphic.
+High contrast, gritty grain, desaturated, dramatic but realistic.
+Face turned slightly toward the left when possible.
+Use a perfectly flat chroma-key background or native transparency for background removal.
+No text, no watermark, no invented logos, no badges, no distorted facial features.
 ```
 
 Si la IA altera rasgos, edad, pelo, barba, mirada o forma de la cara, el resultado se rechaza.
+
+Si el proveedor de IA no permite generar un jugador específico por nombre o likeness, el agente no debe inventar una cara genérica y fingir que es ese jugador. Debe marcar el asset como `needs-ai-provider` o `needs-approved-reference`.
 
 ## Ubicación de Assets
 
@@ -69,21 +71,22 @@ Si la IA altera rasgos, edad, pelo, barba, mirada o forma de la cara, el resulta
 player-assets/
   portraits/
     {playerKey}/
-      source.jpg
+      generated-source.png
       approved-hero.webp
       manifest.json
 ```
 
-`source.jpg` puede omitirse si la licencia de la fuente no permite almacenarla. En ese caso `manifest.json` conserva URL, proveedor, fecha y notas.
+`manifest.json` debe conservar el perfil visual usado, proveedor IA, prompt, fecha, estado de aprobación y notas de QA. Las referencias web usadas para scouting pueden guardarse como URLs/notas, pero no son el asset final.
 
 ## Reglas
 
-- Preferir foto oficial o de buena calidad.
+- Usar referencias actuales solo para entender el look del jugador.
 - Guardar siempre metadata de fuente y estado de aprobación.
-- No deformar rasgos, escudos ni elementos importantes.
+- No modificar una foto encontrada en internet como solución final.
+- No deformar rasgos ni inventar detalles importantes.
 - No reprocesar jugadores ya aprobados.
 - El render del template no debe fallar si el retrato todavía no existe.
-- La IA puede usarse como etapa de estilización, pero no como fuente principal de identidad.
+- La IA debe generar el retrato final o trabajar desde una referencia aprobada por el proyecto.
 - Si no existe retrato aprobado, el template usa placeholder y reporta el faltante.
 - La foto final debe mostrar pura cara, cuello y muy poco hombro.
 - La playera no debe ser protagonista visual del retrato.
@@ -91,13 +94,14 @@ player-assets/
 - Es aceptable cortar un poco cabello o parte superior de cabeza si mejora el llenado del bloque.
 - La salida aprobada debe pesar poco y servirse como `.webp`.
 - El asset aprobado vive en Supabase, no en la computadora local.
+- Nunca publicar un retrato genérico como si fuera un jugador real.
 
 ## QA Visual
 
 Antes de aprobar:
 
 - El jugador se reconoce claramente.
-- La cara no parece generada desde cero.
+- La cara no parece falsa, deformada ni genérica.
 - El recorte no muestra torso ni playera dominante.
 - El retrato llena el alto del renglón sin espacios vacíos visibles.
 - El tamaño funciona dentro del rectángulo del template.
@@ -130,6 +134,8 @@ Versión vigente: `portrait-face-grunge-v2`.
 - `approved`: asset listo para producción.
 - `rejected`: fuente o resultado descartado.
 - `needs-review`: el asset existe pero necesita revisión humana.
+- `needs-ai-provider`: el generador disponible no permite crear esa likeness.
+- `needs-approved-reference`: se requiere referencia aprobada por el proyecto para generar sin inventar una cara.
 
 ## Entrega a Otros Agentes
 
