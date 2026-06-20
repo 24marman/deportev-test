@@ -374,7 +374,7 @@ function pickHeadline(candidates, matchData) {
 function pickHeadlineCandidate(candidates, matchData) {
   const absoluteCandidates = candidates.filter(isAbsoluteNarrativeCandidate);
   if (absoluteCandidates.length) {
-    return absoluteCandidates[0];
+    return combineAbsoluteWithExceptionalSecondary(absoluteCandidates[0], candidates, matchData);
   }
 
   const topPriority = candidates[0]?.priority || 0;
@@ -382,6 +382,94 @@ function pickHeadlineCandidate(candidates, matchData) {
   const topBand = candidates.filter((candidate) => candidate.priority >= topPriority - spread);
   const seed = Number(matchData.source?.eventId || 0);
   return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
+}
+
+function combineAbsoluteWithExceptionalSecondary(absoluteCandidate, candidates, matchData) {
+  const secondary = candidates.find((candidate) => {
+    if (candidate === absoluteCandidate || isAbsoluteNarrativeCandidate(candidate)) return false;
+    return isExceptionalSecondaryNarrative(candidate);
+  });
+
+  if (!secondary) return absoluteCandidate;
+
+  const clause = getExceptionalSecondaryClause(secondary);
+  if (!clause) return absoluteCandidate;
+
+  const combinedText = insertSecondaryClause(absoluteCandidate.text, clause);
+  if (!combinedText || combinedText === absoluteCandidate.text) return absoluteCandidate;
+  if (wordCount(combinedText) > 35 || combinedText.length > 190) return absoluteCandidate;
+
+  return {
+    ...absoluteCandidate,
+    text: combinedText,
+    priority: Number(absoluteCandidate.priority || 0) + 1,
+    source: `${absoluteCandidate.source}+${secondary.source}`,
+    signature: `${absoluteCandidate.signature || getEditorialSignature(absoluteCandidate.text)}+${secondary.signature || getEditorialSignature(secondary.text)}`,
+    combinedWith: {
+      source: secondary.source,
+      signature: secondary.signature || getEditorialSignature(secondary.text),
+      text: secondary.text,
+    },
+  };
+}
+
+function isExceptionalSecondaryNarrative(candidate) {
+  const source = String(candidate?.source || "");
+  const signature = String(candidate?.signature || "");
+  const priority = Number(candidate?.basePriority ?? candidate?.originalPriority ?? candidate?.priority ?? 0);
+
+  if (source === "bsd-incidents:late-decisive-goal") return true;
+  if (source === "editorial-match-tempo" && priority >= 91) return true;
+  if (source === "editorial-hierarchy" && priority >= 93) return true;
+  if (source === "editorial-stats-dominance" && priority >= 96) return true;
+  if (source.includes("advanced-stats:chance-quality") && priority >= 94) return true;
+  if (source.includes("advanced-stats:efficiency") && priority >= 92) return true;
+  if (source === "bsd-scoreline" && priority >= 84 && /claridad|diferencia de goles/.test(candidate.text || "")) return true;
+  if (signature.includes("late") || signature.includes("upset")) return true;
+
+  return false;
+}
+
+function getExceptionalSecondaryClause(candidate) {
+  const source = String(candidate?.source || "");
+  const signature = String(candidate?.signature || "");
+  const text = String(candidate?.text || "");
+
+  if (source === "bsd-incidents:late-decisive-goal" || signature.includes("late")) {
+    const minute = (text.match(/\ben el\s+([0-9]+(?:\+[0-9]+)?')/i) || [])[1];
+    return minute ? `con un gol en el ${minute}` : "en el cierre";
+  }
+
+  if (source === "editorial-match-tempo") return "en un partido de alto ritmo";
+  if (source === "editorial-hierarchy") return "con un resultado de peso";
+  if (source === "editorial-stats-dominance") return "tras resistir el dominio rival";
+  if (source.includes("advanced-stats:efficiency")) return "pese al dominio rival";
+  if (source.includes("advanced-stats:chance-quality")) {
+    return signature.includes("winner-creates") ? "con las ocasiones más claras" : "tras resistir el dominio rival";
+  }
+  if (source === "bsd-scoreline") return "con una victoria clara";
+
+  return "";
+}
+
+function insertSecondaryClause(text, clause) {
+  const cleaned = String(text || "").trim();
+  if (!cleaned || !clause) return cleaned;
+
+  const patterns = [
+    /( venció a [^,]+)(,)/i,
+    /( derrotó a [^,]+)(,)/i,
+    /( superó a [^,]+)(,)/i,
+    /( cayó ante [^,]+)(,)/i,
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.test(cleaned)) {
+      return cleaned.replace(pattern, `$1 ${clause}$2`);
+    }
+  }
+
+  return cleaned.replace(/\.$/, ` ${clause}.`);
 }
 
 function isAbsoluteNarrativeCandidate(candidate) {
@@ -522,6 +610,7 @@ function buildEditorialDecisionAudit(picked, rankedFacts, signalSummary) {
           level: picked.level || getCandidateNarrativeLevel(picked),
           editorialSignalBoost: picked.editorialSignalBoost || 0,
           editorialSignalReasons: picked.editorialSignalReasons || [],
+          combinedWith: picked.combinedWith || null,
           text: picked.text,
         }
       : null,
@@ -661,6 +750,7 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
     candidates.push({
       priority: 96,
       source: "bsd-incidents:late-decisive-goal",
+      signature: "late-equalizer",
       text: `${teamName} igualó en el ${minute}${groupPhrase} y evita la derrota en un cierre que deja a ${opponentName} sin una victoria clave.`,
     });
     return;
@@ -669,6 +759,7 @@ function pushDecisiveLateGoalCandidate(candidates, context) {
   candidates.push({
     priority: 96,
     source: "bsd-incidents:late-decisive-goal",
+    signature: "late-winner",
     text: `${teamName} decidió el partido en el ${minute}${groupPhrase} y cambia el cierre con un golpe clave.`,
   });
 }

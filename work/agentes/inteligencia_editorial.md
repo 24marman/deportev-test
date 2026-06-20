@@ -195,9 +195,24 @@ Solo se usa si no hay una historia mejor o como detalle secundario muy breve.
 - Curiosidades del calendario.
 - Datos historicos menores.
 
-### Regla de desempate
+### Regla de combinacion
 
-Si dos narrativas compiten por espacio, elegir la de mayor impacto para la competicion. Una observacion tactica nunca puede desplazar una clasificacion, eliminacion, liderato asegurado, record o hito historico mayor. Si ambas son relevantes, combinarlas en una sola frase corta y dejar fuera el detalle menos importante.
+Si dos narrativas compiten por espacio, elegir la de mayor impacto para la competicion. Una observacion tactica nunca puede desplazar una clasificacion, eliminacion, liderato asegurado, record o hito historico mayor.
+
+Si existe una consecuencia de Nivel 1 y tambien ocurre algo realmente noticioso dentro del partido, el agente puede combinarlas en una sola frase corta:
+
+- Gol tardio decisivo.
+- Partido de alto ritmo o muchos goles.
+- Dominio estadistico fuerte que contradice el resultado.
+- Sorpresa de jerarquia.
+- Goleada o diferencia de goles relevante.
+
+Ejemplos:
+
+- `Mexico vencio a Corea del Sur con un gol en el 90+3', asegura el liderato del Grupo A y se convierte en el primer clasificado del Mundial.`
+- `Estados Unidos vencio a Australia pese al dominio rival, asegura el liderato del Grupo D y se convierte en el primer clasificado del Mundial.`
+
+Si la combinacion queda larga, confusa o mete una segunda idea debil, se conserva solo la consecuencia principal.
 
 ## RAG y fuentes externas
 

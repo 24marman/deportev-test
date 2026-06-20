@@ -16,6 +16,8 @@ function baseMatch({
   tournament = null,
   priorGroup = null,
   newsDigest = null,
+  homeScorers = [],
+  awayScorers = [],
 }) {
   const matchData = {
     source: {
@@ -42,8 +44,8 @@ function baseMatch({
       },
     },
     events: {
-      homeScorers: [],
-      awayScorers: [],
+      homeScorers,
+      awayScorers,
     },
     context: {
       matchStats,
@@ -89,7 +91,7 @@ function runNegativeCase({ name, matchData, rejectIncludes }) {
 }
 
 runCase({
-  name: "qualification beats stats",
+  name: "qualification stays primary while adding exceptional stats",
   matchData: baseMatch({
     eventId: 4002,
     home: "USA",
@@ -119,8 +121,30 @@ runCase({
       ],
     },
   }),
-  expectSignature: "first-qualified-and-group-winner",
-  expectIncludes: ["primer clasificado"],
+  expectIncludes: ["primer clasificado", "pese al dominio rival"],
+});
+
+runCase({
+  name: "qualification can combine with late decisive goal",
+  matchData: baseMatch({
+    eventId: 4003,
+    home: "Mexico",
+    away: "South Korea",
+    homeScore: 1,
+    awayScore: 0,
+    group: "A",
+    matchday: 2,
+    homeScorers: [{ minute: "90+3'", player: "Lozano" }],
+    tournament: {
+      qualifiedBeforeCount: 0,
+      qualifiedAfterCount: 1,
+      newlyQualified: ["mexico"],
+      newlyGuaranteedFirst: ["mexico"],
+      firstQualifiedThisTournament: true,
+    },
+  }),
+  expectSignature: "first-qualified-and-group-winner+late-winner",
+  expectIncludes: ["90+3'", "primer clasificado"],
 });
 
 runCase({
