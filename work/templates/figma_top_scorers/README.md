@@ -44,4 +44,6 @@ Los retratos aprobados de jugadores viven en Supabase Storage:
 player-assets/portraits/{playerKey}/approved-hero.webp
 ```
 
+El encuadre aprobado debe priorizar cara y cuello, con muy poco hombro si hace falta. No debe verse la playera como elemento principal del recorte.
+
 Si un retrato no existe, el template muestra fallback visual y el pipeline marca al jugador como pendiente.
