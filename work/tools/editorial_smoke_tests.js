@@ -287,8 +287,8 @@ const paraguayTurkeyMatchdayTwo = baseMatch({
 runCase({
   name: "matchday two winner stakes beat loser chance dominance",
   matchData: paraguayTurkeyMatchdayTwo,
-  expectSignature: "matchday-two-winner-enters-top-two-race",
-  expectIncludes: ["Paraguay", "tres puntos clave", "pelea por avanzar"],
+  expectSignature: "matchday-two-winner-enters-top-two-race+winner-survives-opponent-clear-chances",
+  expectIncludes: ["Paraguay", "dominio de Turquía", "tres puntos clave", "pelea por avanzar"],
 });
 
 runNegativeCase({

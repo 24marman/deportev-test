@@ -374,8 +374,11 @@ function pickHeadline(candidates, matchData) {
 function pickHeadlineCandidate(candidates, matchData) {
   const absoluteCandidates = candidates.filter(isAbsoluteNarrativeCandidate);
   if (absoluteCandidates.length) {
-    return combineAbsoluteWithExceptionalSecondary(absoluteCandidates[0], candidates, matchData);
+    return combinePrimaryWithExceptionalSecondary(absoluteCandidates[0], candidates);
   }
+
+  const combinedPrimary = combinePrimaryWithExceptionalSecondary(candidates[0], candidates);
+  if (combinedPrimary && combinedPrimary !== candidates[0]) return combinedPrimary;
 
   const topPriority = candidates[0]?.priority || 0;
   const spread = getEditorialSelectionSpread(topPriority);
@@ -384,33 +387,40 @@ function pickHeadlineCandidate(candidates, matchData) {
   return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
 }
 
-function combineAbsoluteWithExceptionalSecondary(absoluteCandidate, candidates, matchData) {
+function combinePrimaryWithExceptionalSecondary(primaryCandidate, candidates) {
+  if (!primaryCandidate || !canCombinePrimaryCandidate(primaryCandidate)) return primaryCandidate;
+
   const secondary = candidates.find((candidate) => {
-    if (candidate === absoluteCandidate || isAbsoluteNarrativeCandidate(candidate)) return false;
+    if (candidate === primaryCandidate || isAbsoluteNarrativeCandidate(candidate)) return false;
     return isExceptionalSecondaryNarrative(candidate);
   });
 
-  if (!secondary) return absoluteCandidate;
+  if (!secondary) return primaryCandidate;
 
   const clause = getExceptionalSecondaryClause(secondary);
-  if (!clause) return absoluteCandidate;
+  if (!clause) return primaryCandidate;
 
-  const combinedText = insertSecondaryClause(absoluteCandidate.text, clause);
-  if (!combinedText || combinedText === absoluteCandidate.text) return absoluteCandidate;
-  if (wordCount(combinedText) > 35 || combinedText.length > 190) return absoluteCandidate;
+  const combinedText = insertSecondaryClause(primaryCandidate.text, clause);
+  if (!combinedText || combinedText === primaryCandidate.text) return primaryCandidate;
+  if (wordCount(combinedText) > 35 || combinedText.length > 190) return primaryCandidate;
 
   return {
-    ...absoluteCandidate,
+    ...primaryCandidate,
     text: combinedText,
-    priority: Number(absoluteCandidate.priority || 0) + 1,
-    source: `${absoluteCandidate.source}+${secondary.source}`,
-    signature: `${absoluteCandidate.signature || getEditorialSignature(absoluteCandidate.text)}+${secondary.signature || getEditorialSignature(secondary.text)}`,
+    priority: Number(primaryCandidate.priority || 0) + 1,
+    source: `${primaryCandidate.source}+${secondary.source}`,
+    signature: `${primaryCandidate.signature || getEditorialSignature(primaryCandidate.text)}+${secondary.signature || getEditorialSignature(secondary.text)}`,
     combinedWith: {
       source: secondary.source,
       signature: secondary.signature || getEditorialSignature(secondary.text),
       text: secondary.text,
     },
   };
+}
+
+function canCombinePrimaryCandidate(candidate) {
+  if (isAbsoluteNarrativeCandidate(candidate)) return true;
+  return Number(candidate?.level || getCandidateNarrativeLevel(candidate)) <= 2;
 }
 
 function isExceptionalSecondaryNarrative(candidate) {
@@ -443,7 +453,10 @@ function getExceptionalSecondaryClause(candidate) {
   if (source === "editorial-match-tempo") return "en un partido de alto ritmo";
   if (source === "editorial-hierarchy") return "con un resultado de peso";
   if (source === "editorial-stats-dominance") return "tras resistir el dominio rival";
-  if (source.includes("advanced-stats:efficiency")) return "pese al dominio rival";
+  if (source.includes("advanced-stats:efficiency")) {
+    const dominantTeam = (text.match(/resistió el dominio de ([^,]+?) y/i) || [])[1];
+    return dominantTeam ? `pese al dominio de ${dominantTeam}` : "pese al dominio rival";
+  }
   if (source.includes("advanced-stats:chance-quality")) {
     return signature.includes("winner-creates") ? "con las ocasiones más claras" : "tras resistir el dominio rival";
   }
@@ -455,6 +468,35 @@ function getExceptionalSecondaryClause(candidate) {
 function insertSecondaryClause(text, clause) {
   const cleaned = String(text || "").trim();
   if (!cleaned || !clause) return cleaned;
+
+  const concreteDominance = clause.match(/^pese al dominio de (.+)$/i);
+  if (concreteDominance) {
+    const team = concreteDominance[1];
+    const dominancePatterns = [
+      new RegExp(`^(.*?)( venció a ${escapeRegExp(team)})( y (?:consigue|suma|fortalece|queda|asegura|llega|toma|da|mantiene|se convierte)\\b)`, "i"),
+      new RegExp(`^(.*?)( derrotó a ${escapeRegExp(team)})( y (?:consigue|suma|fortalece|queda|asegura|llega|toma|da|mantiene|se convierte)\\b)`, "i"),
+      new RegExp(`^(.*?)( superó a ${escapeRegExp(team)})( y (?:consigue|suma|fortalece|queda|asegura|llega|toma|da|mantiene|se convierte)\\b)`, "i"),
+    ];
+
+    for (const pattern of dominancePatterns) {
+      if (pattern.test(cleaned)) {
+        return cleaned.replace(pattern, `$1 resistió el dominio de ${team}$3`);
+      }
+    }
+
+    const namedOpponentBeforeComma = [
+      new RegExp(`( venció a ${escapeRegExp(team)})(,)`, "i"),
+      new RegExp(`( derrotó a ${escapeRegExp(team)})(,)`, "i"),
+      new RegExp(`( superó a ${escapeRegExp(team)})(,)`, "i"),
+      new RegExp(`( cayó ante ${escapeRegExp(team)})(,)`, "i"),
+    ];
+
+    for (const pattern of namedOpponentBeforeComma) {
+      if (pattern.test(cleaned)) {
+        return cleaned.replace(pattern, "$1 pese al dominio rival$2");
+      }
+    }
+  }
 
   const patterns = [
     /( venció a [^,]+)(,)/i,
@@ -470,6 +512,10 @@ function insertSecondaryClause(text, clause) {
   }
 
   return cleaned.replace(/\.$/, ` ${clause}.`);
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isAbsoluteNarrativeCandidate(candidate) {
