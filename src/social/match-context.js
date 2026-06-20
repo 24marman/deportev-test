@@ -1063,7 +1063,7 @@ function pushMatchIntelligenceCandidates(candidates, context) {
       priority: 92,
       source: "bsd-advanced-stats:efficiency",
       signature: "winner-survives-opponent-clear-chances",
-      text: `${dominantName} llevó el peso del partido, pero ${winnerName} fue más eficaz y se queda con la victoria.`,
+      text: `${winnerName} resistió el dominio de ${dominantName} y fue más eficaz para llevarse la victoria.`,
     });
   }
 
@@ -1092,10 +1092,11 @@ function pushMatchIntelligenceCandidates(candidates, context) {
     const dominant = getDominant(matchIntelligence.bigChancePair, 3);
     if (dominant) {
       const teamName = dominant.side === "home" ? homeName : awayName;
+      const dominantTeamWon = !winnerSide || dominant.side === winnerSide;
       candidates.push({
-        priority: 86,
+        priority: dominantTeamWon ? 86 : 61,
         source: "bsd-advanced-stats:big-chances",
-        signature: "big-chances-domination",
+        signature: dominantTeamWon ? "big-chances-domination" : "loser-big-chances-domination",
         text: `${teamName} tuvo las ocasiones más claras y marcó el ritmo ofensivo del partido.`,
       });
     }
@@ -1494,6 +1495,18 @@ function pushGroupStakesCandidates(candidates, context) {
   }
 
   if (!isDraw && matchday === 2) {
+    if (Number(winnerAfter.points || 0) >= 3 && Number(winnerAfter.points || 0) < 6) {
+      const winnerWasUnderPressure = Number(winnerAfter.wins || 0) === 1;
+      candidates.push({
+        priority: winnerWasUnderPressure ? 97 : 92,
+        source: "editorial-group-stakes",
+        signature: winnerWasUnderPressure ? "matchday-two-winner-enters-top-two-race" : "matchday-two-winner-strengthens-top-two-race",
+        text: winnerWasUnderPressure
+          ? `${winnerName} venció a ${loserName} y consigue tres puntos clave para meterse en la pelea por avanzar en el Grupo ${group}.`
+          : `${winnerName} venció a ${loserName} y fortalece su posición en la pelea por avanzar en el Grupo ${group}.`,
+      });
+    }
+
     if (Number(winnerAfter.points || 0) >= 6) {
       candidates.push({
         priority: 93,
@@ -1522,7 +1535,7 @@ function pushGroupStakesCandidates(candidates, context) {
     if (Number(loserAfter.points || 0) === 0 && loserOutlook?.remainingGames > 0) {
       const winnerFirstWin = Number(winnerAfter.wins || 0) === 1;
       candidates.push({
-        priority: 96,
+        priority: 99,
         source: "editorial-group-stakes",
         signature: "matchday-two-loser-best-third-route",
         text: winnerFirstWin

@@ -258,4 +258,43 @@ runNegativeCase({
   rejectIncludes: ["eliminado", "eliminada", "ya no depende"],
 });
 
+const paraguayTurkeyMatchdayTwo = baseMatch({
+  eventId: 8101,
+  home: "Turkiye",
+  away: "Paraguay",
+  homeScore: 0,
+  awayScore: 1,
+  group: "D",
+  matchday: 2,
+  matchStats: [
+    { name: "Big chances", home: 4, away: 1 },
+    { name: "Expected goals", home: 1.9, away: 0.7 },
+    { name: "Total shots", home: 16, away: 7 },
+    { name: "Shots on target", home: 5, away: 2 },
+  ],
+  priorGroup: {
+    homePrior: { played: 1, wins: 1, draws: 0, losses: 0, points: 3, goalsFor: 2, goalsAgainst: 1 },
+    awayPrior: { played: 1, wins: 0, draws: 0, losses: 1, points: 0, goalsFor: 0, goalsAgainst: 2 },
+    homeAfter: { played: 2, wins: 1, draws: 0, losses: 1, points: 3, goalsFor: 2, goalsAgainst: 2 },
+    awayAfter: { played: 2, wins: 1, draws: 0, losses: 1, points: 3, goalsFor: 1, goalsAgainst: 2 },
+    groupOutlook: {
+      home: { remainingGames: 1, guaranteedTopTwo: false, oneStepFromTopTwo: false },
+      away: { remainingGames: 1, guaranteedTopTwo: false, oneStepFromTopTwo: false },
+    },
+  },
+});
+
+runCase({
+  name: "matchday two winner stakes beat loser chance dominance",
+  matchData: paraguayTurkeyMatchdayTwo,
+  expectSignature: "matchday-two-winner-enters-top-two-race",
+  expectIncludes: ["Paraguay", "tres puntos clave", "pelea por avanzar"],
+});
+
+runNegativeCase({
+  name: "loser big chances cannot become headline",
+  matchData: paraguayTurkeyMatchdayTwo,
+  rejectIncludes: ["Turquía tuvo las ocasiones más claras"],
+});
+
 console.log("Editorial smoke tests passed.");
