@@ -58,8 +58,8 @@ function baseMatch({
   return matchData;
 }
 
-function runCase({ name, matchData, expectSignature, expectIncludes }) {
-  const context = getInternalContext(matchData);
+function runCase({ name, matchData, expectSignature, expectIncludes, rejectIncludes, options }) {
+  const context = getInternalContext(matchData, options);
   const headline = context.headline;
   console.log(`${name}: ${headline}`);
   console.log(`  source=${context.source} signature=${context.signature}`);
@@ -72,6 +72,13 @@ function runCase({ name, matchData, expectSignature, expectIncludes }) {
     assert(
       headline.toLowerCase().includes(fragment.toLowerCase()),
       `${name}: expected headline to include "${fragment}"`,
+    );
+  }
+
+  for (const fragment of rejectIncludes || []) {
+    assert(
+      !headline.toLowerCase().includes(fragment.toLowerCase()),
+      `${name}: headline should not include "${fragment}"`,
     );
   }
 }
@@ -143,8 +150,44 @@ runCase({
       firstQualifiedThisTournament: true,
     },
   }),
-  expectSignature: "first-qualified-and-group-winner+late-winner",
+  expectSignature: "first-qualified-and-group-winner:leader-first-ticket+late-winner",
   expectIncludes: ["90+3'", "primer clasificado"],
+});
+
+runCase({
+  name: "absolute consequence memory avoids exact repeated copy",
+  matchData: baseMatch({
+    eventId: 4004,
+    home: "USA",
+    away: "Australia",
+    homeScore: 2,
+    awayScore: 0,
+    group: "D",
+    matchday: 2,
+    matchStats: [
+      { name: "Total shots", home: 6, away: 24 },
+      { name: "Shots on target", home: 3, away: 11 },
+      { name: "Expected goals", home: 0.9, away: 2.6 },
+    ],
+    tournament: {
+      qualifiedBeforeCount: 0,
+      qualifiedAfterCount: 1,
+      newlyQualified: ["usa"],
+      newlyGuaranteedFirst: ["usa"],
+      firstQualifiedThisTournament: true,
+    },
+  }),
+  options: {
+    recentEditorialSignatures: [
+      {
+        signature: "first-qualified-and-group-winner:leader-first-ticket+winner-survives-opponent-clear-chances",
+        headline:
+          "Estados Unidos venció a Australia pese al dominio rival, asegura el liderato del Grupo D y se convierte en el primer clasificado del Mundial.",
+      },
+    ],
+  },
+  expectIncludes: ["Estados Unidos", "clasificad"],
+  rejectIncludes: ["se convierte en el primer clasificado del Mundial"],
 });
 
 runCase({
@@ -287,14 +330,30 @@ const paraguayTurkeyMatchdayTwo = baseMatch({
 runCase({
   name: "matchday two winner stakes beat loser chance dominance",
   matchData: paraguayTurkeyMatchdayTwo,
-  expectSignature: "matchday-two-winner-enters-top-two-race+winner-survives-opponent-clear-chances",
-  expectIncludes: ["Paraguay", "dominio de Turquía", "tres puntos clave", "pelea por avanzar"],
+  expectSignature: "matchday-two-winner-enters-top-two-race:back-in-race+winner-survives-opponent-clear-chances",
+  expectIncludes: ["Paraguay", "resistió el dominio de Turquía", "pelea por avanzar"],
+  rejectIncludes: ["consigue tres puntos clave", "venció a Turquía pese al dominio de Turquía"],
 });
 
 runNegativeCase({
   name: "loser big chances cannot become headline",
   matchData: paraguayTurkeyMatchdayTwo,
   rejectIncludes: ["Turquía tuvo las ocasiones más claras"],
+});
+
+runCase({
+  name: "recent editorial memory forces a different group-stakes variant",
+  matchData: paraguayTurkeyMatchdayTwo,
+  options: {
+    recentEditorialSignatures: [
+      {
+        signature: "matchday-two-winner-enters-top-two-race:back-in-race+winner-survives-opponent-clear-chances",
+        headline: "Paraguay resistió el dominio de Turquía y se mete de lleno en la pelea por avanzar en el Grupo D.",
+      },
+    ],
+  },
+  expectIncludes: ["Paraguay"],
+  rejectIncludes: ["se mete de lleno en la pelea por avanzar", "consigue tres puntos clave"],
 });
 
 console.log("Editorial smoke tests passed.");

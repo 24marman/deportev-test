@@ -387,6 +387,39 @@ function pickHeadlineCandidate(candidates, matchData) {
   return topBand[Math.abs(seed) % topBand.length] || candidates[0] || null;
 }
 
+function pushVariantCandidates(candidates, variants, context = {}) {
+  const seed = hashText(
+    [
+      context.seed,
+      context.homeName,
+      context.awayName,
+      context.winnerName,
+      context.loserName,
+      context.group,
+      context.matchday,
+    ].filter(Boolean).join(":"),
+  );
+
+  variants
+    .map((variant, index) => ({
+      ...variant,
+      priority: Number(variant.priority || context.priority || 0) - index * 0.25,
+      variantIndex: index,
+      variantSeed: seed,
+    }))
+    .sort((a, b) => {
+      const left = Math.abs(seed + a.variantIndex * 17) % variants.length;
+      const right = Math.abs(seed + b.variantIndex * 17) % variants.length;
+      return left - right;
+    })
+    .forEach((variant, index) => {
+      candidates.push({
+        ...variant,
+        priority: Number(variant.priority || 0) - index * 0.05,
+      });
+    });
+}
+
 function combinePrimaryWithExceptionalSecondary(primaryCandidate, candidates) {
   if (!primaryCandidate || !canCombinePrimaryCandidate(primaryCandidate)) return primaryCandidate;
 
@@ -460,7 +493,10 @@ function getExceptionalSecondaryClause(candidate) {
   if (source.includes("advanced-stats:chance-quality")) {
     return signature.includes("winner-creates") ? "con las ocasiones más claras" : "tras resistir el dominio rival";
   }
-  if (source === "bsd-scoreline") return "con una victoria clara";
+  if (source === "bsd-scoreline") {
+    const clauses = ["con una victoria clara", "con autoridad", "sin dejar dudas", "con margen en el marcador"];
+    return clauses[Math.abs(hashText(`${text}:${signature}`)) % clauses.length];
+  }
 
   return "";
 }
@@ -484,6 +520,19 @@ function insertSecondaryClause(text, clause) {
       }
     }
 
+    const namedOpponentBeforeConsequence = [
+      new RegExp(`^(.*?)( venció a ${escapeRegExp(team)})( y )`, "i"),
+      new RegExp(`^(.*?)( derrotó a ${escapeRegExp(team)})( y )`, "i"),
+      new RegExp(`^(.*?)( superó a ${escapeRegExp(team)})( y )`, "i"),
+      new RegExp(`^(.*?)( se impuso a ${escapeRegExp(team)})( y )`, "i"),
+    ];
+
+    for (const pattern of namedOpponentBeforeConsequence) {
+      if (pattern.test(cleaned)) {
+        return cleaned.replace(pattern, `$1 resistió el dominio de ${team}$3`);
+      }
+    }
+
     const namedOpponentBeforeComma = [
       new RegExp(`( venció a ${escapeRegExp(team)})(,)`, "i"),
       new RegExp(`( derrotó a ${escapeRegExp(team)})(,)`, "i"),
@@ -499,6 +548,10 @@ function insertSecondaryClause(text, clause) {
   }
 
   const patterns = [
+    /( venció a [^,]+?)( y )/i,
+    /( derrotó a [^,]+?)( y )/i,
+    /( superó a [^,]+?)( y )/i,
+    /( se impuso a [^,]+?)( y )/i,
     /( venció a [^,]+)(,)/i,
     /( derrotó a [^,]+)(,)/i,
     /( superó a [^,]+)(,)/i,
@@ -540,13 +593,13 @@ function getEditorialSelectionSpread(topPriority) {
 }
 
 function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []) {
-  const recent = new Set((recentEditorialSignatures || []).filter(Boolean));
+  const recent = buildRecentEditorialMemory(recentEditorialSignatures);
 
   return candidates
     .map((candidate) => {
       const signature = candidate.signature || getEditorialSignature(candidate.text);
       const level = Number(candidate.level || getCandidateNarrativeLevel(candidate));
-      const repeatPenalty = level === 1 ? 0 : recent.has(signature) ? 18 : 0;
+      const repeatPenalty = getRecentUsagePenalty(candidate, signature, recent, { level });
 
       return {
         ...candidate,
@@ -562,6 +615,65 @@ function rankCandidatesForRecentUsage(candidates, recentEditorialSignatures = []
       if (b.level === 1 && a.level !== 1) return 1;
       return b.priority - a.priority;
     });
+}
+
+function buildRecentEditorialMemory(entries = []) {
+  const exact = new Set();
+  const components = new Set();
+  const families = new Set();
+  const textSignatures = new Set();
+
+  for (const entry of entries || []) {
+    const signature = typeof entry === "string" ? entry : entry?.signature;
+    const headline = typeof entry === "string" ? "" : entry?.headline;
+
+    if (signature) {
+      exact.add(signature);
+      for (const component of getSignatureComponents(signature)) {
+        components.add(component);
+        families.add(getSignatureFamily(component));
+      }
+    }
+
+    if (headline) {
+      textSignatures.add(getEditorialSignature(headline));
+      textSignatures.add(getNarrativeFingerprint(headline));
+    }
+  }
+
+  return { exact, components, families, textSignatures };
+}
+
+function getRecentUsagePenalty(candidate, signature, recent, { level = 0 } = {}) {
+  const textSignature = getEditorialSignature(candidate.text);
+  const narrativeFingerprint = getNarrativeFingerprint(candidate.text);
+  const components = getSignatureComponents(signature);
+  const families = components.map(getSignatureFamily);
+
+  if (recent.exact.has(signature) || recent.textSignatures.has(textSignature) || recent.textSignatures.has(narrativeFingerprint)) {
+    return 90;
+  }
+
+  if (components.some((component) => recent.components.has(component))) {
+    return level === 1 ? 12 : 48;
+  }
+
+  if (families.some((family) => recent.families.has(family))) {
+    return 0;
+  }
+
+  return 0;
+}
+
+function getSignatureComponents(signature) {
+  return String(signature || "")
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getSignatureFamily(signature) {
+  return String(signature || "").split(":")[0];
 }
 
 function applyEditorialSignalBoosts(candidates, signals) {
@@ -725,6 +837,52 @@ function getEditorialSignature(text) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
+}
+
+function getNarrativeFingerprint(text) {
+  const keep = new Set([
+    "asegura",
+    "avanzar",
+    "cerca",
+    "clasificado",
+    "clasificacion",
+    "clara",
+    "complica",
+    "consigue",
+    "control",
+    "dominio",
+    "empata",
+    "eliminado",
+    "favorito",
+    "fortalece",
+    "grupo",
+    "historico",
+    "importante",
+    "invicto",
+    "jornada",
+    "liderato",
+    "mantiene",
+    "mejores",
+    "pelea",
+    "puntos",
+    "reacciona",
+    "resiste",
+    "siguiente",
+    "terceros",
+    "victoria",
+  ]);
+
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[0-9]+(?:\+[0-9]+)?'/g, "MIN")
+    .replace(/[0-9]+-[0-9]+/g, "SCORE")
+    .replace(/\bgrupo\s+[a-z]\b/g, "grupo X")
+    .replace(/\b[a-z]{4,}\b/g, (word) => (keep.has(word) ? word : "TEAM"))
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
 }
 
 function isHistoricFirstWin(facts, prior) {
@@ -1543,13 +1701,64 @@ function pushGroupStakesCandidates(candidates, context) {
   if (!isDraw && matchday === 2) {
     if (Number(winnerAfter.points || 0) >= 3 && Number(winnerAfter.points || 0) < 6) {
       const winnerWasUnderPressure = Number(winnerAfter.wins || 0) === 1;
-      candidates.push({
-        priority: winnerWasUnderPressure ? 97 : 92,
-        source: "editorial-group-stakes",
-        signature: winnerWasUnderPressure ? "matchday-two-winner-enters-top-two-race" : "matchday-two-winner-strengthens-top-two-race",
-        text: winnerWasUnderPressure
-          ? `${winnerName} venció a ${loserName} y consigue tres puntos clave para meterse en la pelea por avanzar en el Grupo ${group}.`
-          : `${winnerName} venció a ${loserName} y fortalece su posición en la pelea por avanzar en el Grupo ${group}.`,
+      const basePriority = winnerWasUnderPressure ? 97 : 92;
+      const baseSignature = winnerWasUnderPressure
+        ? "matchday-two-winner-enters-top-two-race"
+        : "matchday-two-winner-strengthens-top-two-race";
+      const variants = winnerWasUnderPressure
+        ? [
+            {
+              priority: basePriority,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:back-in-race`,
+              text: `${winnerName} venció a ${loserName} y se mete de lleno en la pelea por avanzar en el Grupo ${group}.`,
+            },
+            {
+              priority: basePriority - 0.5,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:route-open`,
+              text: `${winnerName} superó a ${loserName} y mantiene abierta su ruta hacia la siguiente fase en el Grupo ${group}.`,
+            },
+            {
+              priority: basePriority - 1,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:group-tightens`,
+              text: `${winnerName} se impuso a ${loserName} y aprieta la pelea por avanzar en el Grupo ${group}.`,
+            },
+            {
+              priority: basePriority - 1.5,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:final-day-alive`,
+              text: `${winnerName} derrotó a ${loserName} y llega con vida a la última jornada del Grupo ${group}.`,
+            },
+          ]
+        : [
+            {
+              priority: basePriority,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:gains-ground`,
+              text: `${winnerName} venció a ${loserName} y gana margen en la lucha por avanzar en el Grupo ${group}.`,
+            },
+            {
+              priority: basePriority - 0.5,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:holds-place`,
+              text: `${winnerName} superó a ${loserName} y refuerza su lugar en la pelea del Grupo ${group}.`,
+            },
+            {
+              priority: basePriority - 1,
+              source: "editorial-group-stakes",
+              signature: `${baseSignature}:keeps-control`,
+              text: `${winnerName} derrotó a ${loserName} y conserva una posición favorable en el Grupo ${group}.`,
+            },
+          ];
+
+      pushVariantCandidates(candidates, variants, {
+        seed: "matchday-two-winner-stakes",
+        winnerName,
+        loserName,
+        group,
+        matchday,
       });
     }
 
@@ -1678,49 +1887,159 @@ function pushTournamentConsequenceCandidates(candidates, context) {
     const guaranteedFirst = newlyGuaranteedFirst.has(teamKey);
 
     if (firstQualified && guaranteedFirst && won) {
-      candidates.push({
-        priority: 130,
-        level: 1,
-        source: "editorial-tournament-consequence",
-        signature: "first-qualified-and-group-winner",
-        text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y se convierte en el primer clasificado del Mundial.`,
-      });
+      pushVariantCandidates(
+        candidates,
+        [
+          {
+            priority: 130,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "first-qualified-and-group-winner:leader-first-ticket",
+            text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y se convierte en el primer clasificado del Mundial.`,
+          },
+          {
+            priority: 129.5,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "first-qualified-and-group-winner:first-through",
+            text: `${teamName} venció a ${opponentName}, amarra el Grupo ${group} y abre la lista de clasificados del Mundial.`,
+          },
+          {
+            priority: 129,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "first-qualified-and-group-winner:group-sealed",
+            text: `${teamName} venció a ${opponentName}, queda como líder del Grupo ${group} y firma el primer boleto a la siguiente fase.`,
+          },
+        ],
+        { seed: "first-qualified-and-group-winner", winnerName: teamName, loserName: opponentName, group },
+      );
       continue;
     }
 
     if (firstQualified) {
-      candidates.push({
-        priority: 128,
-        level: 1,
-        source: "editorial-tournament-consequence",
-        signature: "first-qualified-tournament",
-        text: won
-          ? `${teamName} venció a ${opponentName} y se convierte en el primer clasificado del Mundial.`
-          : `${teamName} asegura su clasificación y se convierte en el primer clasificado del Mundial.`,
-      });
+      pushVariantCandidates(
+        candidates,
+        won
+          ? [
+              {
+                priority: 128,
+                level: 1,
+                source: "editorial-tournament-consequence",
+                signature: "first-qualified-tournament:first-through",
+                text: `${teamName} venció a ${opponentName} y se convierte en el primer clasificado del Mundial.`,
+              },
+              {
+                priority: 127.5,
+                level: 1,
+                source: "editorial-tournament-consequence",
+                signature: "first-qualified-tournament:first-ticket",
+                text: `${teamName} venció a ${opponentName} y firma el primer boleto a la siguiente fase.`,
+              },
+              {
+                priority: 127,
+                level: 1,
+                source: "editorial-tournament-consequence",
+                signature: "first-qualified-tournament:opens-qualified-list",
+                text: `${teamName} venció a ${opponentName} y abre la lista de clasificados del Mundial.`,
+              },
+            ]
+          : [
+              {
+                priority: 128,
+                level: 1,
+                source: "editorial-tournament-consequence",
+                signature: "first-qualified-tournament:first-through-no-win",
+                text: `${teamName} asegura su clasificación y se convierte en el primer clasificado del Mundial.`,
+              },
+              {
+                priority: 127.5,
+                level: 1,
+                source: "editorial-tournament-consequence",
+                signature: "first-qualified-tournament:first-ticket-no-win",
+                text: `${teamName} asegura el primer boleto a la siguiente fase del Mundial.`,
+              },
+            ],
+        { seed: "first-qualified-tournament", winnerName: teamName, loserName: opponentName, group },
+      );
       continue;
     }
 
     if (guaranteedFirst && won) {
-      candidates.push({
-        priority: 124,
-        level: 1,
-        source: "editorial-tournament-consequence",
-        signature: "newly-qualified-and-group-winner",
-        text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y avanza a la siguiente fase.`,
-      });
+      pushVariantCandidates(
+        candidates,
+        [
+          {
+            priority: 124,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "newly-qualified-and-group-winner:leader-and-through",
+            text: `${teamName} venció a ${opponentName}, asegura el liderato del Grupo ${group} y avanza a la siguiente fase.`,
+          },
+          {
+            priority: 123.5,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "newly-qualified-and-group-winner:group-sealed",
+            text: `${teamName} venció a ${opponentName} y deja asegurados el primer lugar del Grupo ${group} y la clasificación.`,
+          },
+          {
+            priority: 123,
+            level: 1,
+            source: "editorial-tournament-consequence",
+            signature: "newly-qualified-and-group-winner:next-round-leader",
+            text: `${teamName} venció a ${opponentName}, avanza como líder del Grupo ${group} y ya piensa en la siguiente fase.`,
+          },
+        ],
+        { seed: "newly-qualified-and-group-winner", winnerName: teamName, loserName: opponentName, group },
+      );
       continue;
     }
 
-    candidates.push({
-      priority: 121,
-      level: 1,
-      source: "editorial-tournament-consequence",
-      signature: "newly-qualified-tournament",
-      text: won
-        ? `${teamName} venció a ${opponentName} y asegura su clasificación a la siguiente fase.`
-        : `${teamName} asegura su clasificación a la siguiente fase tras el resultado del Grupo ${group}.`,
-    });
+    pushVariantCandidates(
+      candidates,
+      won
+        ? [
+            {
+              priority: 121,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-qualified-tournament:through-with-win",
+              text: `${teamName} venció a ${opponentName} y asegura su clasificación a la siguiente fase.`,
+            },
+            {
+              priority: 120.5,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-qualified-tournament:ticket-with-win",
+              text: `${teamName} superó a ${opponentName} y ya tiene boleto para la siguiente fase.`,
+            },
+            {
+              priority: 120,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-qualified-tournament:group-step-with-win",
+              text: `${teamName} venció a ${opponentName} y convierte el resultado en clasificación dentro del Grupo ${group}.`,
+            },
+          ]
+        : [
+            {
+              priority: 121,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-qualified-tournament:through-no-win",
+              text: `${teamName} asegura su clasificación a la siguiente fase tras el resultado del Grupo ${group}.`,
+            },
+            {
+              priority: 120.5,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-qualified-tournament:ticket-no-win",
+              text: `${teamName} ya tiene boleto a la siguiente fase después de lo ocurrido en el Grupo ${group}.`,
+            },
+          ],
+      { seed: "newly-qualified-tournament", winnerName: teamName, loserName: opponentName, group },
+    );
   }
 
   for (const teamKey of [homeKey, awayKey]) {
@@ -1730,15 +2049,43 @@ function pushTournamentConsequenceCandidates(candidates, context) {
     const opponentName = teamKey === homeKey ? awayName : homeName;
     const won = !isDraw && teamKey === winnerKey;
 
-    candidates.push({
-      priority: 120,
-      level: 1,
-      source: "editorial-tournament-consequence",
-      signature: "newly-guaranteed-first",
-      text: won
-        ? `${teamName} venció a ${opponentName} y asegura el primer lugar del Grupo ${group}.`
-        : `${teamName} asegura el primer lugar del Grupo ${group}.`,
-    });
+    pushVariantCandidates(
+      candidates,
+      won
+        ? [
+            {
+              priority: 120,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-guaranteed-first:win-seals-first",
+              text: `${teamName} venció a ${opponentName} y asegura el primer lugar del Grupo ${group}.`,
+            },
+            {
+              priority: 119.5,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-guaranteed-first:win-locks-group",
+              text: `${teamName} superó a ${opponentName} y ya nadie le quita el liderato del Grupo ${group}.`,
+            },
+          ]
+        : [
+            {
+              priority: 120,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-guaranteed-first:no-win-seals-first",
+              text: `${teamName} asegura el primer lugar del Grupo ${group}.`,
+            },
+            {
+              priority: 119.5,
+              level: 1,
+              source: "editorial-tournament-consequence",
+              signature: "newly-guaranteed-first:no-win-locks-group",
+              text: `${teamName} ya tiene asegurado el liderato del Grupo ${group}.`,
+            },
+          ],
+      { seed: "newly-guaranteed-first", winnerName: teamName, loserName: opponentName, group },
+    );
   }
 }
 
@@ -1747,24 +2094,50 @@ function pushWinnerClassificationCandidates(candidates, context) {
   if (!winnerOutlook) return;
 
   if (winnerOutlook.guaranteedFirst) {
-    candidates.push({
-      priority: 115,
-      level: 1,
-      source: "editorial-group-qualification",
-      signature: "winner-guaranteed-first",
-      text: `${winnerName} venció a ${loserName} y asegura el primer lugar del Grupo ${group}.`,
-    });
+    pushVariantCandidates(
+      candidates,
+      [
+        {
+          priority: 115,
+          level: 1,
+          source: "editorial-group-qualification",
+          signature: "winner-guaranteed-first:seals-first",
+          text: `${winnerName} venció a ${loserName} y asegura el primer lugar del Grupo ${group}.`,
+        },
+        {
+          priority: 114.5,
+          level: 1,
+          source: "editorial-group-qualification",
+          signature: "winner-guaranteed-first:locks-lead",
+          text: `${winnerName} superó a ${loserName} y deja asegurado el liderato del Grupo ${group}.`,
+        },
+      ],
+      { seed: "winner-guaranteed-first", winnerName, loserName, group },
+    );
     return;
   }
 
   if (winnerOutlook.guaranteedTopTwo) {
-    candidates.push({
-      priority: 114,
-      level: 1,
-      source: "editorial-group-qualification",
-      signature: "winner-guaranteed-top-two",
-      text: `${winnerName} venció a ${loserName} y asegura matemáticamente su clasificación a la siguiente fase.`,
-    });
+    pushVariantCandidates(
+      candidates,
+      [
+        {
+          priority: 114,
+          level: 1,
+          source: "editorial-group-qualification",
+          signature: "winner-guaranteed-top-two:math-through",
+          text: `${winnerName} venció a ${loserName} y asegura matemáticamente su clasificación a la siguiente fase.`,
+        },
+        {
+          priority: 113.5,
+          level: 1,
+          source: "editorial-group-qualification",
+          signature: "winner-guaranteed-top-two:ticket",
+          text: `${winnerName} superó a ${loserName} y ya tiene boleto para la siguiente fase.`,
+        },
+      ],
+      { seed: "winner-guaranteed-top-two", winnerName, loserName, group },
+    );
     return;
   }
 

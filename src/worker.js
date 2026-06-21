@@ -379,10 +379,13 @@ async function processFinishedEvent(event, state, contextEvents) {
 
 function getRecentEditorialSignatures(state, currentEventId, limit = 8) {
   return Object.entries(state.matches || {})
-    .filter(([eventId, record]) => eventId !== String(currentEventId) && record?.editorialSignature)
+    .filter(([eventId, record]) => eventId !== String(currentEventId) && (record?.editorialSignature || record?.editorialHeadline))
     .sort((a, b) => new Date(b[1].processedAt || b[1].renderCompletedAt || 0) - new Date(a[1].processedAt || a[1].renderCompletedAt || 0))
     .slice(0, limit)
-    .map(([, record]) => record.editorialSignature);
+    .map(([, record]) => ({
+      signature: record.editorialSignature || null,
+      headline: record.editorialHeadline || null,
+    }));
 }
 
 async function maybeWarmEditorialContext(eventId, state, contextEvents) {
