@@ -10,6 +10,7 @@ function emptyState() {
   return {
     matches: {},
     topScorers: {},
+    topScorersPrep: {},
     editorialResearch: {
       runs: [],
       updatedAt: null,
@@ -24,6 +25,7 @@ function parseState(raw) {
     return {
       matches: parsed.matches || {},
       topScorers: parsed.topScorers || {},
+      topScorersPrep: parsed.topScorersPrep || {},
       editorialResearch: parsed.editorialResearch || emptyState().editorialResearch,
       updatedAt: parsed.updatedAt || null,
     };

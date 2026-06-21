@@ -15,11 +15,14 @@
     "portrait:preserve": "node work/tools/portrait_lab.js --mode preserve",
     "portrait:ai": "node work/tools/portrait_lab.js --mode all",
     "portrait:finalize": "node work/tools/portrait_lab.js --mode finalize",
+    "portrait:higgsfield": "node work/tools/higgsfield_portrait.js",
+    "top-scorers:prep": "node work/tools/top_scorers_prep.js",
     "fotmob:player-image": "node work/tools/fotmob_player_image.js",
     "guardian:player-image": "node work/tools/guardian_player_image.js",
     "bsd:match": "node work/tools/bsd_match_adapter.js"
   },
   "dependencies": {
+    "@higgsfield/cli": "^0.2.3",
     "@supabase/supabase-js": "2.50.0",
     "dotenv": "16.4.7",
     "playwright": "1.49.1",

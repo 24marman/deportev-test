@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const fs = require("fs");
 const { ensureBucket, getSupabaseClient, uploadBufferToStorage } = require("./storage");
 const { normalizeTeamKey } = require("./team-metadata");
 
@@ -93,23 +94,21 @@ async function getApprovedPlayerPortraits(player = {}) {
 
 async function savePlayerPortraitManifest(player = {}, manifest = {}) {
   const playerKey = getPlayerAssetKey(player);
+  const payload = {
+    ...manifest,
+    playerKey,
+    player,
+    status: manifest.status || "pending",
+    source: manifest.source || null,
+    processingVersion: manifest.processingVersion || "portrait-face-grunge-v2",
+    cropProfile: manifest.cropProfile || "face-neck-tight",
+    orientation: manifest.orientation || "faces-left",
+    framing: manifest.framing || "face-neck-minimal-shoulder",
+    notes: manifest.notes || "",
+    updatedAt: new Date().toISOString(),
+  };
   const body = Buffer.from(
-    `${JSON.stringify(
-      {
-        playerKey,
-        player,
-        status: manifest.status || "pending",
-        source: manifest.source || null,
-        processingVersion: manifest.processingVersion || "portrait-face-grunge-v2",
-        cropProfile: manifest.cropProfile || "face-neck-tight",
-        orientation: manifest.orientation || "faces-left",
-        framing: manifest.framing || "face-neck-minimal-shoulder",
-        notes: manifest.notes || "",
-        updatedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(payload, null, 2)}\n`,
   );
 
   return uploadBufferToStorage({
@@ -120,6 +119,35 @@ async function savePlayerPortraitManifest(player = {}, manifest = {}) {
     publicBucket: true,
     allowedMimeTypes: ["image/webp", "image/jpeg", "image/png", "application/json"],
   });
+}
+
+async function saveApprovedPlayerPortrait(player = {}, filePath, manifest = {}) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`Approved portrait file not found: ${filePath}`);
+  }
+
+  const playerKey = getPlayerAssetKey(player);
+  const body = fs.readFileSync(filePath);
+  const portraitUpload = await uploadBufferToStorage({
+    bucket: PLAYER_ASSET_BUCKET,
+    objectPath: `${PLAYER_ASSET_PREFIX}/${playerKey}/approved-hero.webp`,
+    buffer: body,
+    contentType: "image/webp",
+    publicBucket: true,
+    allowedMimeTypes: ["image/webp", "image/jpeg", "image/png", "application/json"],
+  });
+
+  const manifestUpload = await savePlayerPortraitManifest(player, {
+    ...manifest,
+    status: manifest.status || "approved",
+    approvedHero: portraitUpload.publicUrl || null,
+  });
+
+  return {
+    ...portraitUpload,
+    manifestUrl: manifestUpload.publicUrl || null,
+    playerKey,
+  };
 }
 
 async function resolvePlayerPortraitAssets(player = {}) {
@@ -139,5 +167,6 @@ module.exports = {
   getApprovedPlayerPortraits,
   getPlayerAssetKey,
   resolvePlayerPortraitAssets,
+  saveApprovedPlayerPortrait,
   savePlayerPortraitManifest,
 };

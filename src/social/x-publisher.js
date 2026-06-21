@@ -108,6 +108,76 @@ async function publishFinalScorePost({ matchData, imagePath, recentEditorialSign
   };
 }
 
+function buildTopScorersCaption(matchday, leaders = []) {
+  const leader = leaders[0];
+  const leaderLine = leader ? `${leader.name} lidera con ${leader.goals} goles` : "Tabla de goleo actualizada";
+  return `${leaderLine} tras la Jornada ${matchday} del Mundial 2026.`;
+}
+
+async function publishTopScorersPost({ matchday, imagePath, leaders = [] } = {}) {
+  if (!imagePath || !fs.existsSync(imagePath)) {
+    throw new Error("Top scorers X post blocked because imagePath does not exist.");
+  }
+
+  const mode = getPostMode();
+  const text = buildTopScorersCaption(matchday, leaders);
+
+  if (process.env.TOP_SCORERS_X_ENABLED === "false") {
+    return {
+      published: false,
+      mode,
+      text,
+      reason: "Top scorers X posting is disabled.",
+    };
+  }
+
+  if (mode === "paused") {
+    return {
+      published: false,
+      mode,
+      text,
+      reason: "X posting is paused.",
+    };
+  }
+
+  if (mode === "manual") {
+    return {
+      published: false,
+      mode,
+      text,
+      reason: "Manual mode: top scorers post was prepared but not published.",
+    };
+  }
+
+  if (mode !== "auto") {
+    throw new Error(`Unknown X_POST_MODE: ${mode}`);
+  }
+
+  const client = getXClient();
+  if (!client) {
+    throw new Error("Missing X/Twitter credentials.");
+  }
+
+  const mediaId = await client.v2.uploadMedia(fs.readFileSync(imagePath), {
+    media_type: "image/webp",
+    media_category: "tweet_image",
+  });
+  const tweet = await client.v2.tweet({
+    text,
+    media: {
+      media_ids: [mediaId],
+    },
+  });
+
+  return {
+    published: true,
+    mode,
+    text,
+    tweetId: tweet.data.id,
+    tweetUrl: `https://x.com/i/web/status/${tweet.data.id}`,
+  };
+}
+
 async function verifyXPublisherAccount() {
   const mode = getPostMode();
 
@@ -141,5 +211,6 @@ async function verifyXPublisherAccount() {
 module.exports = {
   buildFinalScoreCaption: (matchData) => buildContextualFinalScoreCaption(matchData, getInternalContext(matchData)),
   publishFinalScorePost,
+  publishTopScorersPost,
   verifyXPublisherAccount,
 };

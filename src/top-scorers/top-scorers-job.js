@@ -1,9 +1,12 @@
 const path = require("path");
 const { uploadGeneratedImage } = require("../lib/storage");
+const { publishTopScorersPost } = require("../social/x-publisher");
 const { renderTopScorersCard } = require("./render-top-scorers");
+const { hasMatchdayStarted, prepareTopScorersMatchday } = require("./top-scorers-prep");
 const {
   MATCHDAYS_WITH_TOP_SCORERS,
   buildTopScorers,
+  fetchEventsThroughMatchday,
   isMatchdayComplete,
   writeTopScorersData,
 } = require("./top-scorers-data");
@@ -24,14 +27,16 @@ async function processTopScorersMatchday(matchday, state, contextEvents) {
     return state;
   }
 
-  if (!isMatchdayComplete(matchday, contextEvents)) {
+  const events = contextEvents || (await fetchEventsThroughMatchday(matchday));
+
+  if (!isMatchdayComplete(matchday, events)) {
     return state;
   }
 
   console.log(`Top scorers matchday ${matchday} is complete. Rendering leaderboard.`);
 
   const data = await buildTopScorers(matchday, {
-    events: contextEvents,
+    events,
   });
   const outputPath = path.join("outputs", "generated", `top-scorers-jornada-${matchday}.webp`);
   const dataPath = path.join("outputs", "generated", `top-scorers-jornada-${matchday}.json`);
@@ -45,6 +50,14 @@ async function processTopScorersMatchday(matchday, state, contextEvents) {
   });
 
   const uploadResult = await uploadGeneratedImage(outputPath, getTopScorersOutputName(matchday));
+  const xPost = await publishTopScorersPost({
+    matchday,
+    imagePath: outputPath,
+    leaders: data.leaders,
+  }).catch((error) => ({
+    published: false,
+    reason: error.message,
+  }));
 
   state.topScorers = {
     ...(state.topScorers || {}),
@@ -55,6 +68,8 @@ async function processTopScorersMatchday(matchday, state, contextEvents) {
       publicUrl: uploadResult.publicUrl || null,
       uploaded: Boolean(uploadResult.uploaded),
       uploadReason: uploadResult.reason || null,
+      xPublished: Boolean(xPost.published),
+      xPost,
       leaderCount: data.leaders.length,
     },
   };
@@ -73,7 +88,13 @@ async function maybeProcessTopScorers(state, contextEvents) {
 
   let nextState = state;
   for (const matchday of MATCHDAYS_WITH_TOP_SCORERS) {
-    nextState = await processTopScorersMatchday(matchday, nextState, contextEvents);
+    const key = String(matchday);
+    if (nextState.topScorers?.[key]?.processedAt) continue;
+    if (!hasMatchdayStarted(matchday)) continue;
+
+    const events = await fetchEventsThroughMatchday(matchday);
+    nextState = await prepareTopScorersMatchday(nextState, matchday, { events });
+    nextState = await processTopScorersMatchday(matchday, nextState, events);
   }
 
   return nextState;

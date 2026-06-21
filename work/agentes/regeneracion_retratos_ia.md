@@ -6,6 +6,8 @@ Convertir cualquier imagen de referencia de un futbolista en un retrato candidat
 
 Este agente no decide goleadores, no arma el template completo y no publica contenido. Su unica responsabilidad es producir un asset visual consistente: rostro cercano, blanco y negro, extra grunge y fondo verde removible.
 
+Proveedor de produccion: Higgsfield con preset `top-scorers-bw-grunge-v1`.
+
 Regla principal: preservar la identidad visual del input. Si el resultado parece otra persona, se rechaza aunque el estilo sea bonito.
 
 ## Entrada
@@ -50,17 +52,29 @@ outputs/player-assets/portraits/{playerKey}/
 ## Flujo
 
 1. Recibe una imagen de referencia.
-2. Primero ejecuta modo `preserve`: usa los pixeles originales, hace close-up, blanco y negro, grunge, alpha y fuente verde.
-3. Si `preserve` no alcanza calidad, construye un prompt de edicion con `buildPortraitPrompt`.
-4. Pide a la IA preservar rostro exacto, no inventar otra persona.
-5. Guarda el resultado crudo como `generated-source.png`.
+2. Construye el prompt bloqueado con `buildTopScorerHiggsfieldPrompt`.
+3. Sube la referencia a Higgsfield.
+4. Genera una imagen 1:1 con fondo verde plano y direccion de arte fija.
+5. Guarda el resultado crudo como `higgsfield-source.png`.
 6. Ejecuta `removeChromaAndApplyGrunge`.
 7. Genera `approved-hero.webp` como candidato.
-8. Escribe `manifest.json` con version, prompt y estado.
+8. Escribe `manifest.json` con version, prompt, proveedor y estado.
 9. Entrega preview al orquestador para aprobacion humana.
-10. Si se aprueba, el asset queda listo para ser subido a Supabase como retrato reutilizable.
+10. Si se aprueba, el asset se sube a Supabase como retrato reutilizable.
 
 ## Comando
+
+```bash
+npm run portrait:higgsfield -- --input ./referencia.png --player-key bsd-12345
+```
+
+Para probar prompt y rutas sin gastar creditos:
+
+```bash
+npm run portrait:higgsfield -- --input ./referencia.png --player-key bsd-12345 --dry-run
+```
+
+Fallback local/laboratorio:
 
 ```bash
 npm run portrait:preserve -- --input ./referencia.png --player-key bsd-12345 --focus right

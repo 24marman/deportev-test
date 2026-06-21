@@ -173,6 +173,8 @@ async function buildTopScorers(matchday, options = {}) {
   const schedule = getTargetSchedule(matchday);
   const table = new Map();
   const finishedEvents = [];
+  const requestedLimit = Number(options.limit || 5);
+  const leaderLimit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 5;
 
   for (const match of schedule) {
     const event = findEventForSchedule(match, events);
@@ -188,7 +190,7 @@ async function buildTopScorers(matchday, options = {}) {
         if (a.firstGoalSort !== b.firstGoalSort) return a.firstGoalSort - b.firstGoalSort;
         return a.displayName.localeCompare(b.displayName, "es");
       })
-      .slice(0, 5)
+      .slice(0, leaderLimit)
       .map(async (leader) => {
         const portraits = options.skipPortraitLookup
           ? { approved: false, hero: null, playerKey: null }
@@ -200,6 +202,7 @@ async function buildTopScorers(matchday, options = {}) {
             });
 
         return {
+          playerId: leader.playerId,
           name: leader.displayName,
           fullName: leader.fullName,
           country: leader.country.toUpperCase(),
@@ -241,6 +244,10 @@ module.exports = {
   MATCHDAYS_WITH_TOP_SCORERS,
   buildTopScorers,
   fetchEventsThroughMatchday,
+  getDateRangeForMatchday,
+  getExactMatchdaySchedule,
+  getTargetSchedule,
+  isFinishedStatus,
   isMatchdayComplete,
   writeTopScorersData,
 };

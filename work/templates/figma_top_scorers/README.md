@@ -14,6 +14,18 @@ También puede renderizar datos acumulados reales cuando existan variables de BS
 node src/top-scorers/render-top-scorers.js --matchday 2 --out outputs/generated/top-scorers-jornada-2.webp
 ```
 
+Preparar candidatos antes del cierre de jornada:
+
+```bash
+npm run top-scorers:prep -- --matchday 2 --force
+```
+
+Generar un retrato con el preset fijo de Higgsfield:
+
+```bash
+npm run portrait:higgsfield -- --input ./referencia.png --player-key bsd-12345
+```
+
 ## Datos Esperados
 
 ```json
@@ -42,8 +54,20 @@ Los retratos aprobados de jugadores viven en Supabase Storage:
 
 ```text
 player-assets/portraits/{playerKey}/approved-hero.webp
+player-assets/portraits/{playerKey}/manifest.json
 ```
 
 El encuadre aprobado debe priorizar cara y cuello, con muy poco hombro si hace falta. No debe verse la playera como elemento principal del recorte.
 
 Si un retrato no existe, el template muestra fallback visual y el pipeline marca al jugador como pendiente.
+
+## Automatizacion
+
+- Jornada 2 se publica al terminar todos los partidos del 2026-06-23.
+- Jornada 3 se publica al terminar todos los partidos del 2026-06-27.
+- El worker empieza a preparar candidatos desde que inicia la jornada.
+- `TOP_SCORERS_PREP_CANDIDATE_LIMIT` controla cuantos jugadores probables se adelantan.
+- `TOP_SCORERS_PORTRAIT_GENERATION_ENABLED=true` activa Higgsfield en produccion.
+- `TOP_SCORERS_X_ENABLED=false` desactiva solo la publicacion de esta tabla en X.
+
+El render final nunca debe esperar a investigar todos los retratos desde cero. Al cierre de jornada solo recalcula posiciones, reutiliza retratos aprobados y procesa cambios de ultima hora.

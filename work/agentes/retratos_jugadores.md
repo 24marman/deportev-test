@@ -6,7 +6,7 @@ Crear, aprobar y reutilizar retratos estilizados de jugadores para templates vis
 
 Este agente no arma el diseño completo. Su responsabilidad es entregar un asset visual listo para que otros templates lo usen sin volver a buscar ni procesar la foto.
 
-Cuando necesita crear un nuevo candidato visual, primero delega la busqueda de referencia al agente `fuentes_retratos_jugadores.md` y despues delega la regeneración al agente `regeneracion_retratos_ia.md`. La prioridad es preservar la cara de la imagen de entrada; si la IA inventa otra cara, el candidato se rechaza.
+Cuando necesita crear un nuevo candidato visual, primero delega la busqueda de referencia al agente `fuentes_retratos_jugadores.md` y despues delega la regeneración al agente `regeneracion_retratos_ia.md`. El proveedor de produccion para la tabla de goleadores es Higgsfield con el preset fijo `top-scorers-bw-grunge-v1`. La prioridad es preservar la cara de la imagen de entrada; si la IA inventa otra cara, el candidato se rechaza.
 
 ## Objetivo
 
@@ -30,7 +30,7 @@ La regla clave es: la IA genera el retrato una vez, se aprueba, se guarda y el r
    - look de selección o torneo.
    Fuentes preferidas: Guardian Player Guide por nombre/seleccion y FotMob por `playerId`.
 7. No modifica directamente la foto encontrada en internet. La referencia sirve para entender cómo se ve el jugador, no como asset final.
-8. Primero genera un candidato con modo `preserve`, usando los pixeles de la imagen de entrada para no perder identidad. Si no alcanza la calidad visual, intenta edición IA con preservación estricta. Esta generación usa el flujo del agente `Regeneración de Retratos IA`.
+8. En produccion genera un candidato con Higgsfield usando el preset bloqueado. El modo `preserve` queda como laboratorio/fallback local para comparar identidad o rescatar un asset urgente.
 9. La generación debe pedir:
     - close-up extremo de cara y cuello,
     - casi nada de hombro,
@@ -51,7 +51,15 @@ La regla clave es: la IA genera el retrato una vez, se aprueba, se guarda y el r
 
 ## Uso de IA
 
-La IA es la fuente del retrato final. Internet solo se usa para scouting visual, salvo que el proyecto entregue una referencia aprobada.
+La IA es la fuente del retrato final. Internet solo se usa para obtener una referencia visual clara, salvo que el proyecto entregue una referencia aprobada.
+
+Preset vigente de produccion:
+
+```text
+top-scorers-bw-grunge-v1
+```
+
+Ese preset exige el mismo blanco y negro, brillo, contraste, sombras, grano, textura, nitidez, encuadre y fondo para todos los jugadores. El objetivo no es que cada jugador "salga bonito", sino que todos parezcan producidos en la misma sesion editorial.
 
 Prompt base operativo:
 
@@ -139,13 +147,16 @@ Cada manifest debe guardar:
 - encuadre,
 - estado de aprobación.
 
-Versión vigente: `portrait-face-grunge-v2`.
+Versión vigente: `top-scorers-bw-grunge-v1`.
 
 ## Estados
 
 - `pending`: jugador detectado, falta fuente o procesamiento.
+- `reference-ready`: ya existe referencia de Guardian, falta generacion Higgsfield.
 - `candidate`: ya existe una propuesta visual, falta aprobación.
 - `approved`: asset listo para producción.
+- `higgsfield-failed`: hubo referencia, pero fallo la generacion IA.
+- `generated-local`: se genero WebP local, pero no se pudo subir a Supabase.
 - `rejected`: fuente o resultado descartado.
 - `needs-review`: el asset existe pero necesita revisión humana.
 - `needs-ai-provider`: el generador disponible no permite crear esa likeness.
