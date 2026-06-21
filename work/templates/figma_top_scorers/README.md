@@ -69,5 +69,6 @@ Si un retrato no existe, el template muestra fallback visual y el pipeline marca
 - `TOP_SCORERS_PREP_CANDIDATE_LIMIT` controla cuantos jugadores probables se adelantan.
 - `TOP_SCORERS_PORTRAIT_GENERATION_ENABLED=true` activa Higgsfield en produccion.
 - `TOP_SCORERS_X_ENABLED=false` desactiva solo la publicacion de esta tabla en X.
+- En Railway, Higgsfield debe autenticarse con variables, no con el archivo local de la Mac. La opcion mas estable es `HIGGSFIELD_CREDENTIALS_JSON` con el JSON de credenciales; como alternativa, usar `HIGGSFIELD_ACCESS_TOKEN` y opcionalmente `HIGGSFIELD_REFRESH_TOKEN`.
 
 El render final nunca debe esperar a investigar todos los retratos desde cero. Al cierre de jornada solo recalcula posiciones, reutiliza retratos aprobados y procesa cambios de ultima hora.

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { removeChromaAndApplyGrunge } = require("./portrait-ai-pipeline");
@@ -39,14 +40,80 @@ function trimForError(value) {
   return `${clean.slice(0, 1400)}...`;
 }
 
+function redactKnownSecrets(value) {
+  let clean = String(value || "");
+  const secrets = [
+    process.env.HIGGSFIELD_ACCESS_TOKEN,
+    process.env.HIGGSFIELD_TOKEN,
+    process.env.HIGGSFIELD_REFRESH_TOKEN,
+  ].filter((secret) => typeof secret === "string" && secret.length > 8);
+
+  for (const secret of secrets) {
+    clean = clean.split(secret).join("[redacted]");
+  }
+
+  return clean;
+}
+
+function getHiggsfieldCredentials() {
+  const credentialsJson = String(process.env.HIGGSFIELD_CREDENTIALS_JSON || "").trim();
+  if (credentialsJson) {
+    try {
+      const parsed = JSON.parse(credentialsJson);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("credentials must be a JSON object");
+      }
+      return parsed;
+    } catch (error) {
+      throw new Error(`HIGGSFIELD_CREDENTIALS_JSON is not valid JSON: ${error.message}`);
+    }
+  }
+
+  const accessToken = String(process.env.HIGGSFIELD_ACCESS_TOKEN || process.env.HIGGSFIELD_TOKEN || "").trim();
+  if (!accessToken) return null;
+
+  const credentials = {
+    access_token: accessToken,
+  };
+
+  const refreshToken = String(process.env.HIGGSFIELD_REFRESH_TOKEN || "").trim();
+  if (refreshToken) {
+    credentials.refresh_token = refreshToken;
+  }
+
+  return credentials;
+}
+
+function buildHiggsfieldProcessEnv() {
+  const credentials = getHiggsfieldCredentials();
+  if (!credentials) return process.env;
+
+  const runtimeHome =
+    process.env.HIGGSFIELD_RUNTIME_HOME ||
+    path.join(os.tmpdir(), "deportev-higgsfield-runtime");
+  const configRoot = path.join(runtimeHome, ".config");
+  const credentialsDir = path.join(configRoot, "higgsfield");
+  const credentialsPath = path.join(credentialsDir, "credentials.json");
+
+  ensureDir(credentialsDir);
+  fs.writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2), { mode: 0o600 });
+
+  return {
+    ...process.env,
+    HOME: runtimeHome,
+    XDG_CONFIG_HOME: configRoot,
+  };
+}
+
 function runHiggsfieldCli(args, options = {}) {
   const command = resolveHiggsfieldCli();
   const timeoutMs = options.timeoutMs || parseDurationMs(process.env.HIGGSFIELD_WAIT_TIMEOUT || "10m");
+  const env = buildHiggsfieldProcessEnv();
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: process.cwd(),
-      env: process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -70,7 +137,7 @@ function runHiggsfieldCli(args, options = {}) {
     child.on("close", (code) => {
       clearTimeout(timer);
       if (code !== 0) {
-        reject(new Error(`Higgsfield CLI failed (${code}): ${trimForError(stderr || stdout)}`));
+        reject(new Error(`Higgsfield CLI failed (${code}): ${trimForError(redactKnownSecrets(stderr || stdout))}`));
         return;
       }
 
@@ -242,5 +309,7 @@ module.exports = {
   parseJsonFromOutput,
   resolveHiggsfieldCli,
   runHiggsfieldCli,
+  buildHiggsfieldProcessEnv,
+  getHiggsfieldCredentials,
   uploadHiggsfieldImage,
 };
