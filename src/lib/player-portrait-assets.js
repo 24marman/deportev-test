@@ -1,5 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const path = require("path");
+const { pathToFileURL } = require("url");
 const { ensureBucket, getSupabaseClient, uploadBufferToStorage } = require("./storage");
 const { normalizeTeamKey } = require("./team-metadata");
 
@@ -60,8 +62,20 @@ function publicUrl(client, objectPath) {
 async function getApprovedPlayerPortraits(player = {}) {
   const client = getSupabaseClient();
   const playerKey = getPlayerAssetKey(player);
+  const localHeroPath = path.join("outputs", "player-assets", "portraits", playerKey, "approved-hero.webp");
+  const localManifestPath = path.join("outputs", "player-assets", "portraits", playerKey, "manifest.json");
 
   if (!client) {
+    if (fs.existsSync(localHeroPath)) {
+      return {
+        approved: true,
+        playerKey,
+        hero: pathToFileURL(path.resolve(localHeroPath)).href,
+        manifest: fs.existsSync(localManifestPath) ? pathToFileURL(path.resolve(localManifestPath)).href : null,
+        source: "local-cache",
+      };
+    }
+
     return {
       approved: false,
       playerKey,
