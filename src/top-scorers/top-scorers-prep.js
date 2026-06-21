@@ -24,7 +24,7 @@ function isPrepEnabled() {
 }
 
 function isGenerationEnabled() {
-  return process.env.TOP_SCORERS_PORTRAIT_GENERATION_ENABLED === "true";
+  return process.env.TOP_SCORERS_PORTRAIT_GENERATION_ENABLED !== "false";
 }
 
 function getCandidateLimit() {

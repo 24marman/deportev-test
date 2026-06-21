@@ -25,11 +25,11 @@ Usage:
 
 Examples:
   npm run top-scorers:prep -- --matchday 2 --dry-run --force
-  TOP_SCORERS_PORTRAIT_GENERATION_ENABLED=true npm run top-scorers:prep -- --matchday 2 --force
+  TOP_SCORERS_PORTRAIT_GENERATION_ENABLED=false npm run top-scorers:prep -- --matchday 2 --force
 
 Notes:
   --dry-run only computes candidates; it does not download or generate portraits.
-  --generate enables Higgsfield generation for this run.
+  Higgsfield generation is enabled by default. Set TOP_SCORERS_PORTRAIT_GENERATION_ENABLED=false for reference-only runs.
 `);
 }
 
