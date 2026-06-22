@@ -52,19 +52,30 @@ function validatePostInput({ matchData, imagePath }) {
   }
 }
 
-async function publishFinalScorePost({ matchData, imagePath, recentEditorialSignatures } = {}) {
+async function publishFinalScorePost({ matchData, imagePath, recentEditorialSignatures, headlineOverride } = {}) {
   validatePostInput({ matchData, imagePath });
 
   const mode = getPostMode();
   const fallbackContext = getInternalContext(matchData, { recentEditorialSignatures });
   const context =
-    mode === "paused"
-      ? fallbackContext
-      : await writeEditorialHeadline({
-          matchData,
-          context: fallbackContext,
-          recentEditorialSignatures,
-        });
+    headlineOverride
+      ? {
+          ...fallbackContext,
+          headline: String(headlineOverride).trim(),
+          source: `manual-headline-override+${fallbackContext.source}`,
+          signature: `manual-headline-override:${matchData.source?.eventId || "unknown"}`,
+          decision: {
+            ...(fallbackContext.decision || {}),
+            manualHeadlineOverride: true,
+          },
+        }
+      : mode === "paused"
+        ? fallbackContext
+        : await writeEditorialHeadline({
+            matchData,
+            context: fallbackContext,
+            recentEditorialSignatures,
+          });
   const text = buildContextualFinalScoreCaption(matchData, context);
 
   if (mode === "paused") {

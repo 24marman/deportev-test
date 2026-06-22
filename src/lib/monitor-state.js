@@ -9,6 +9,7 @@ const stateObjectPath = process.env.MONITOR_STATE_PATH || "monitor-state.json";
 function emptyState() {
   return {
     matches: {},
+    manualReposts: {},
     topScorers: {},
     topScorersPrep: {},
     editorialResearch: {
@@ -24,6 +25,7 @@ function parseState(raw) {
     const parsed = JSON.parse(raw);
     return {
       matches: parsed.matches || {},
+      manualReposts: parsed.manualReposts || {},
       topScorers: parsed.topScorers || {},
       topScorersPrep: parsed.topScorersPrep || {},
       editorialResearch: parsed.editorialResearch || emptyState().editorialResearch,

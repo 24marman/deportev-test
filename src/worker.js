@@ -26,6 +26,13 @@ const bsd = require("../work/tools/bsd_match_adapter");
 const generatedDir = path.join("outputs", "generated");
 const DEFAULT_AUTOPOST_NOT_BEFORE = "2026-06-14T23:00:00.000Z";
 const DEFAULT_GROUP_STAGE_CONTEXT_START_DATE = "2026-06-11";
+const MANUAL_REPOST_JOBS = [
+  {
+    key: "2026-06-21-uruguay-cabo-verde-corrected-headline",
+    eventId: "8325",
+    headline: "Cabo Verde le cerró el camino a Uruguay y convierte el empate sin goles en un resultado histórico.",
+  },
+];
 
 function slug(value) {
   return String(value || "")
@@ -96,6 +103,7 @@ async function renderEvent(eventId, options = {}) {
       matchData,
       imagePath: outputPath,
       recentEditorialSignatures: options.recentEditorialSignatures,
+      headlineOverride: options.headlineOverride,
     }),
   ]);
 
@@ -195,6 +203,95 @@ async function runStartupJob() {
     await renderEvent(eventId);
   } catch (error) {
     console.error(`Startup render failed: ${error.message}`);
+  }
+}
+
+function shouldRunManualRepostJobs() {
+  if (process.env.MANUAL_REPOSTS_ENABLED === "false") return false;
+  if (process.env.MANUAL_REPOSTS_ENABLED === "true") return true;
+
+  return Boolean(
+    process.env.NODE_ENV === "production" ||
+      process.env.RAILWAY_ENVIRONMENT ||
+      process.env.RAILWAY_PROJECT_ID ||
+      process.env.RAILWAY_SERVICE_ID,
+  );
+}
+
+async function runManualRepostJobs() {
+  if (!shouldRunManualRepostJobs()) return;
+
+  let state = await loadMonitorState();
+  const pendingJobs = MANUAL_REPOST_JOBS.filter((job) => {
+    const record = state.manualReposts?.[job.key];
+    return !record?.postedAt && !(record?.attemptedAt && process.env.MANUAL_REPOST_RETRY !== "true");
+  });
+
+  if (!pendingJobs.length) {
+    console.log("No pending manual repost jobs.");
+    return;
+  }
+
+  const monitorEvents = await fetchMonitorEvents();
+  const contextEvents = await fetchCompetitionContextEvents(monitorEvents);
+
+  for (const job of pendingJobs) {
+    const attemptedAt = new Date().toISOString();
+    state.manualReposts = {
+      ...(state.manualReposts || {}),
+      [job.key]: {
+        ...(state.manualReposts?.[job.key] || {}),
+        eventId: String(job.eventId),
+        headline: job.headline,
+        attemptedAt,
+      },
+    };
+    await saveMonitorState(state);
+
+    try {
+      console.log(`Running manual repost ${job.key} for BSD event ${job.eventId}.`);
+      const result = await renderEvent(job.eventId, {
+        contextEvents,
+        recentEditorialSignatures: getRecentEditorialSignatures(state, job.eventId),
+        headlineOverride: job.headline,
+      });
+
+      state = await loadMonitorState();
+      state.manualReposts = {
+        ...(state.manualReposts || {}),
+        [job.key]: {
+          ...(state.manualReposts?.[job.key] || {}),
+          eventId: String(job.eventId),
+          headline: job.headline,
+          attemptedAt,
+          completedAt: new Date().toISOString(),
+          postedAt: result.socialResult?.published ? new Date().toISOString() : null,
+          tweetUrl: result.socialResult?.tweetUrl || null,
+          publicUrl: result.uploadResult?.publicUrl || null,
+          outputPath: result.outputPath,
+          text: result.socialResult?.text || null,
+          mode: result.socialResult?.mode || null,
+          reason: result.socialResult?.reason || null,
+          published: Boolean(result.socialResult?.published),
+        },
+      };
+      await saveMonitorState(state);
+    } catch (error) {
+      state = await loadMonitorState();
+      state.manualReposts = {
+        ...(state.manualReposts || {}),
+        [job.key]: {
+          ...(state.manualReposts?.[job.key] || {}),
+          eventId: String(job.eventId),
+          headline: job.headline,
+          attemptedAt,
+          failedAt: new Date().toISOString(),
+          error: error.message,
+        },
+      };
+      await saveMonitorState(state);
+      console.error(`Manual repost ${job.key} failed: ${error.message}`);
+    }
   }
 }
 
@@ -572,6 +669,7 @@ async function runMonitorLoop() {
 }
 
 runStartupJob()
+  .then(runManualRepostJobs)
   .then(runMonitorLoop)
   .catch((error) => {
     console.error(error);
