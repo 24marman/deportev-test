@@ -151,6 +151,71 @@ async function main() {
       });
 
       assert.strictEqual(validation.ok, false, "headline missing qualification context should be rejected");
+
+      const repeatedCaboVerdeTemplate = validateEditorialHeadline(
+        "Cabo Verde empató con Uruguay y suma un punto histórico ante una de las candidatas al título.",
+        {
+          teamNames: ["Cabo Verde", "Uruguay"],
+          requiredNarratives: [],
+          recentHeadlines: [
+            "Cabo Verde empató con España y suma un punto histórico ante una de las candidatas al título.",
+          ],
+          baseHeadline: "",
+        },
+      );
+
+      assert.strictEqual(repeatedCaboVerdeTemplate.ok, false, "reused Cabo Verde historic-point template should be rejected");
+    },
+  );
+
+  await withEnv(
+    {
+      OPENAI_API_KEY: "",
+      EDITORIAL_AI_ENABLED: "true",
+    },
+    async () => {
+      const fallbackContext = {
+        headline: "Cabo Verde empató con Uruguay y suma un punto histórico ante una de las candidatas al título.",
+        source: "test",
+        signature: "test-repeat",
+        facts: [
+          {
+            priority: 99,
+            source: "test",
+            signature: "test-repeat",
+            text: "Cabo Verde empató con Uruguay y suma un punto histórico ante una de las candidatas al título.",
+          },
+          {
+            priority: 98,
+            source: "test",
+            signature: "test-alternative",
+            text: "Cabo Verde le cerró el camino a Uruguay y convierte el empate en un resultado histórico.",
+          },
+        ],
+      };
+      const fallbackMatch = baseMatch({
+        eventId: 9002,
+        home: "Cabo Verde",
+        away: "Uruguay",
+        homeScore: 0,
+        awayScore: 0,
+        group: "H",
+        matchday: 1,
+      });
+
+      const guarded = await writeEditorialHeadline({
+        matchData: fallbackMatch,
+        context: fallbackContext,
+        recentEditorialSignatures: [
+          {
+            headline: "Cabo Verde empató con España y suma un punto histórico ante una de las candidatas al título.",
+          },
+        ],
+      });
+
+      assert.strictEqual(guarded.aiWriter.used, false, "fallback path should not use AI without a key");
+      assert.strictEqual(guarded.headline, "Cabo Verde le cerró el camino a Uruguay y convierte el empate en un resultado histórico.");
+      assert.strictEqual(guarded.aiWriter.fallbackAdjusted, true, "fallback should be adjusted away from repeated text");
     },
   );
 

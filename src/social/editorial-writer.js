@@ -10,6 +10,10 @@ const BANNED_TEMPLATE_FRAGMENTS = [
   "suma tres puntos para la tabla",
   "se mete de lleno en la pelea por avanzar",
   "con una victoria clara",
+  "suma un punto histórico ante una de las candidatas al título",
+  "suma un punto historico ante una de las candidatas al titulo",
+  "suma un punto histórico frente a una de las candidatas al título",
+  "suma un punto historico frente a una de las candidatas al titulo",
 ];
 
 function isEditorialAiEnabled() {
@@ -27,19 +31,29 @@ async function writeEditorialHeadline({
 } = {}) {
   if (!context?.headline) return context;
 
+  const validationRules = buildValidationRules(matchData, context, recentEditorialSignatures);
+
   if (!isEditorialAiEnabled()) {
-    return withWriterMeta(context, {
+    const fallback = pickMemorySafeFallback(context, validationRules);
+    return withWriterMeta(fallback.context, {
       used: false,
       reason: process.env.EDITORIAL_AI_ENABLED === "false" ? "Editorial AI disabled." : "OPENAI_API_KEY is missing.",
+      fallbackAdjusted: fallback.adjusted,
+      fallbackReason: fallback.reason,
     });
   }
 
   if (typeof fetchImpl !== "function") {
-    return withWriterMeta(context, { used: false, reason: "fetch is unavailable." });
+    const fallback = pickMemorySafeFallback(context, validationRules);
+    return withWriterMeta(fallback.context, {
+      used: false,
+      reason: "fetch is unavailable.",
+      fallbackAdjusted: fallback.adjusted,
+      fallbackReason: fallback.reason,
+    });
   }
 
   const payload = buildWriterPayload(matchData, context, recentEditorialSignatures);
-  const validationRules = buildValidationRules(matchData, context, recentEditorialSignatures);
   const attempts = Math.max(1, Math.min(3, Number(maxAttempts || DEFAULT_MAX_ATTEMPTS)));
   let lastError = "";
 
@@ -85,10 +99,13 @@ async function writeEditorialHeadline({
     }
   }
 
-  return withWriterMeta(context, {
+  const fallback = pickMemorySafeFallback(context, validationRules);
+  return withWriterMeta(fallback.context, {
     used: false,
     reason: lastError || "Generated headline did not pass validation.",
     baseHeadline: context.headline,
+    fallbackAdjusted: fallback.adjusted,
+    fallbackReason: fallback.reason,
   });
 }
 
@@ -100,6 +117,66 @@ function withWriterMeta(context, aiWriter) {
       aiWriter,
     },
     aiWriter,
+  };
+}
+
+function pickMemorySafeFallback(context, validationRules) {
+  const rules = { ...validationRules, baseHeadline: "" };
+  const current = validateEditorialHeadline(context.headline, rules);
+
+  if (current.ok) {
+    return {
+      context,
+      adjusted: false,
+      reason: "fallback headline passed memory validation",
+    };
+  }
+
+  const alternatives = (context.facts || [])
+    .filter((candidate) => candidate?.text && candidate.text !== context.headline)
+    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
+
+  for (const candidate of alternatives) {
+    const validation = validateEditorialHeadline(candidate.text, rules);
+    if (!validation.ok) continue;
+
+    return {
+      context: {
+        ...context,
+        headline: validation.headline,
+        source: `memory-safe-fallback+${candidate.source || context.source}`,
+        signature: candidate.signature || context.signature,
+        decision: {
+          ...(context.decision || {}),
+          memorySafeFallback: {
+            used: true,
+            rejectedHeadline: context.headline,
+            rejectedReason: current.reason,
+          },
+        },
+      },
+      adjusted: true,
+      reason: current.reason,
+    };
+  }
+
+  return {
+    context: {
+      ...context,
+      headline: "",
+      source: `memory-guard:no-safe-headline+${context.source || "unknown"}`,
+      decision: {
+        ...(context.decision || {}),
+        memorySafeFallback: {
+          used: true,
+          rejectedHeadline: context.headline,
+          rejectedReason: current.reason,
+          noSafeAlternative: true,
+        },
+      },
+    },
+    adjusted: true,
+    reason: `No non-repeated fallback headline available: ${current.reason}`,
   };
 }
 
@@ -167,7 +244,7 @@ function buildSystemPrompt() {
     "Puedes combinar una estadística relevante si explica el partido, por ejemplo dominio, ocasiones claras, xG, gol tardío o partido pobre.",
     "No inventes datos. Usa exclusivamente los hechos enviados.",
     "No repitas ni parafrasees titulares recientes. Evita frases de plantilla.",
-    "No uses estas frases: consigue tres puntos clave, suma tres puntos para la tabla, con una victoria clara.",
+    "No uses estas frases: consigue tres puntos clave, suma tres puntos para la tabla, con una victoria clara, suma un punto histórico ante una de las candidatas al título.",
   ].join("\n");
 }
 
@@ -219,7 +296,7 @@ function buildWriterPayload(matchData, context, recentEditorialSignatures = []) 
     stats_context: summarizeStatsForWriter(matchData?.context?.matchStats, homeName, awayName),
     news_context: summarizeNewsForWriter(matchData?.context?.editorialSignals),
     candidate_angles: candidates,
-    recent_headlines: normalizeRecentHeadlines(recentEditorialSignatures).slice(0, 10),
+    recent_headlines: normalizeRecentHeadlines(recentEditorialSignatures).slice(0, 30),
     output_contract: {
       language: "Spanish",
       form: "single short editorial sentence",

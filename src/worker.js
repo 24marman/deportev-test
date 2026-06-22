@@ -377,11 +377,11 @@ async function processFinishedEvent(event, state, contextEvents) {
   return state;
 }
 
-function getRecentEditorialSignatures(state, currentEventId, limit = 8) {
+function getRecentEditorialSignatures(state, currentEventId, limit = Number(process.env.EDITORIAL_MEMORY_LIMIT || 1000)) {
   return Object.entries(state.matches || {})
     .filter(([eventId, record]) => eventId !== String(currentEventId) && (record?.editorialSignature || record?.editorialHeadline))
     .sort((a, b) => new Date(b[1].processedAt || b[1].renderCompletedAt || 0) - new Date(a[1].processedAt || a[1].renderCompletedAt || 0))
-    .slice(0, limit)
+    .slice(0, Math.max(1, Number(limit || 1000)))
     .map(([, record]) => ({
       signature: record.editorialSignature || null,
       headline: record.editorialHeadline || null,

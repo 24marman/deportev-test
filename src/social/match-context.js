@@ -1229,7 +1229,7 @@ function pushMatchIntelligenceCandidates(candidates, context) {
     const resistantIsUnderdog = matchup?.underdog === resistantProfile;
     const consequence = resistantIsUnderdog
       ? resistantProfile.debutant
-        ? "suma un punto histórico"
+        ? "convierte el empate en un resultado histórico"
         : "suma un punto valioso"
       : "rescata un empate valioso";
     const contextPhrase = resistantIsUnderdog
@@ -2289,8 +2289,8 @@ function pushDrawHierarchyCandidates(candidates, homeProfile, awayProfile, homeS
       source: "editorial-hierarchy",
       signature: scoreless ? "debutant-historic-scoreless-draw-vs-favorite" : "debutant-historic-scoring-draw-vs-favorite",
       text: scoreless
-        ? `${underdog.name} empató sin goles ante ${favorite.name} y suma un punto histórico frente a ${favoriteDescription}.`
-        : `${underdog.name} empató con ${favorite.name} y suma un punto histórico ante ${favoriteDescription}.`,
+        ? `${underdog.name} le cerró el camino a ${favorite.name} y convierte el empate sin goles en un resultado histórico.`
+        : `${underdog.name} igualó con ${favorite.name} y firma un resultado histórico frente a ${favoriteDescription}.`,
     });
     return;
   }

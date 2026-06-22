@@ -219,6 +219,36 @@ runCase({
 });
 
 runCase({
+  name: "historic underdog draw avoids reused title-candidate wording",
+  matchData: baseMatch({
+    eventId: 5002,
+    home: "Cabo Verde",
+    away: "Uruguay",
+    homeScore: 0,
+    awayScore: 0,
+    group: "H",
+    matchday: 1,
+    newsDigest: {
+      items: [
+        {
+          title: "Cabo Verde afronta una prueba de jerarquía ante Uruguay",
+          summary: "Uruguay llega como una de las selecciones fuertes del grupo.",
+        },
+      ],
+    },
+  }),
+  options: {
+    recentEditorialSignatures: [
+      {
+        headline: "Cabo Verde empató con España y suma un punto histórico ante una de las candidatas al título.",
+      },
+    ],
+  },
+  expectIncludes: ["Cabo Verde", "histórico"],
+  rejectIncludes: ["suma un punto histórico ante una de las candidatas al título"],
+});
+
+runCase({
   name: "defending champion context",
   matchData: baseMatch({
     eventId: 6001,
