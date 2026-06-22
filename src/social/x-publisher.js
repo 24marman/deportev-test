@@ -2,6 +2,7 @@ const fs = require("fs");
 const { TwitterApi } = require("twitter-api-v2");
 const { buildContextualFinalScoreCaption } = require("./caption");
 const { getInternalContext } = require("./match-context");
+const { writeEditorialHeadline } = require("./editorial-writer");
 
 function getPostMode() {
   return process.env.X_POST_MODE || "manual";
@@ -55,7 +56,15 @@ async function publishFinalScorePost({ matchData, imagePath, recentEditorialSign
   validatePostInput({ matchData, imagePath });
 
   const mode = getPostMode();
-  const context = getInternalContext(matchData, { recentEditorialSignatures });
+  const fallbackContext = getInternalContext(matchData, { recentEditorialSignatures });
+  const context =
+    mode === "paused"
+      ? fallbackContext
+      : await writeEditorialHeadline({
+          matchData,
+          context: fallbackContext,
+          recentEditorialSignatures,
+        });
   const text = buildContextualFinalScoreCaption(matchData, context);
 
   if (mode === "paused") {

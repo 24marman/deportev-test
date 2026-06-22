@@ -1,0 +1,494 @@
+const { getFlagEmoji, normalizeTeamName } = require("./caption");
+
+const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_TIMEOUT_MS = 3200;
+const DEFAULT_MAX_ATTEMPTS = 2;
+
+const BANNED_TEMPLATE_FRAGMENTS = [
+  "consigue tres puntos clave",
+  "tres puntos clave para meterse",
+  "suma tres puntos para la tabla",
+  "se mete de lleno en la pelea por avanzar",
+  "con una victoria clara",
+];
+
+function isEditorialAiEnabled() {
+  if (process.env.EDITORIAL_AI_ENABLED === "false") return false;
+  return Boolean(process.env.OPENAI_API_KEY);
+}
+
+async function writeEditorialHeadline({
+  matchData,
+  context,
+  recentEditorialSignatures = [],
+  fetchImpl = global.fetch,
+  maxAttempts = Number(process.env.EDITORIAL_AI_MAX_ATTEMPTS || DEFAULT_MAX_ATTEMPTS),
+  timeoutMs = Number(process.env.EDITORIAL_AI_TIMEOUT_MS || DEFAULT_TIMEOUT_MS),
+} = {}) {
+  if (!context?.headline) return context;
+
+  if (!isEditorialAiEnabled()) {
+    return withWriterMeta(context, {
+      used: false,
+      reason: process.env.EDITORIAL_AI_ENABLED === "false" ? "Editorial AI disabled." : "OPENAI_API_KEY is missing.",
+    });
+  }
+
+  if (typeof fetchImpl !== "function") {
+    return withWriterMeta(context, { used: false, reason: "fetch is unavailable." });
+  }
+
+  const payload = buildWriterPayload(matchData, context, recentEditorialSignatures);
+  const validationRules = buildValidationRules(matchData, context, recentEditorialSignatures);
+  const attempts = Math.max(1, Math.min(3, Number(maxAttempts || DEFAULT_MAX_ATTEMPTS)));
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const generated = await requestOpenAIHeadline({
+        payload,
+        feedback: lastError,
+        fetchImpl,
+        timeoutMs,
+      });
+      const validation = validateEditorialHeadline(generated, validationRules);
+
+      if (validation.ok) {
+        return withWriterMeta(
+          {
+            ...context,
+            headline: validation.headline,
+            source: `openai-editorial-writer:${getEditorialModel()}+${context.source}`,
+            decision: {
+              ...(context.decision || {}),
+              aiWriter: {
+                used: true,
+                model: getEditorialModel(),
+                attempt,
+                baseHeadline: context.headline,
+              },
+            },
+          },
+          {
+            used: true,
+            model: getEditorialModel(),
+            attempt,
+            baseHeadline: context.headline,
+          },
+        );
+      }
+
+      lastError = validation.reason;
+    } catch (error) {
+      lastError = error.message;
+      break;
+    }
+  }
+
+  return withWriterMeta(context, {
+    used: false,
+    reason: lastError || "Generated headline did not pass validation.",
+    baseHeadline: context.headline,
+  });
+}
+
+function withWriterMeta(context, aiWriter) {
+  return {
+    ...context,
+    decision: {
+      ...(context?.decision || {}),
+      aiWriter,
+    },
+    aiWriter,
+  };
+}
+
+async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || DEFAULT_TIMEOUT_MS)));
+
+  try {
+    const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: getEditorialModel(),
+        temperature: Number(process.env.EDITORIAL_AI_TEMPERATURE || 0.72),
+        max_tokens: 90,
+        messages: [
+          {
+            role: "system",
+            content: buildSystemPrompt(),
+          },
+          {
+            role: "user",
+            content: JSON.stringify(
+              {
+                ...payload,
+                retry_feedback: feedback || null,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await safeResponseText(response);
+      throw new Error(`OpenAI editorial writer failed (${response.status}): ${body.slice(0, 180)}`);
+    }
+
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content || "";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getEditorialModel() {
+  return process.env.EDITORIAL_AI_MODEL || process.env.OPENAI_TEXT_MODEL || DEFAULT_MODEL;
+}
+
+function buildSystemPrompt() {
+  return [
+    "Eres un editor deportivo para una app moderna de futbol.",
+    "Escribe SOLO una frase en español, sin comillas, sin hashtags, sin emojis y sin marcador separado.",
+    "Objetivo: responder qué ocurrió y por qué importa.",
+    "Longitud ideal: 15 a 35 palabras. Máximo dos oraciones si es indispensable.",
+    "Tono: humano, natural, informativo, neutral, con criterio editorial. No suenes a narrador de TV ni a aficionado.",
+    "Prioriza consecuencias competitivas: clasificación, eliminación, liderato, primer lugar, boleto, récord o cambio fuerte del grupo.",
+    "Si hay una consecuencia competitiva importante, debe aparecer antes que estadísticas o lectura táctica.",
+    "Puedes combinar una estadística relevante si explica el partido, por ejemplo dominio, ocasiones claras, xG, gol tardío o partido pobre.",
+    "No inventes datos. Usa exclusivamente los hechos enviados.",
+    "No repitas ni parafrasees titulares recientes. Evita frases de plantilla.",
+    "No uses estas frases: consigue tres puntos clave, suma tres puntos para la tabla, con una victoria clara.",
+  ].join("\n");
+}
+
+function buildWriterPayload(matchData, context, recentEditorialSignatures = []) {
+  const home = matchData?.teams?.home || {};
+  const away = matchData?.teams?.away || {};
+  const homeName = normalizeTeamName(home.name);
+  const awayName = normalizeTeamName(away.name);
+  const homeScore = Number(home.score || 0);
+  const awayScore = Number(away.score || 0);
+  const candidates = (context?.facts || []).slice(0, 8).map((candidate) => ({
+    priority: Number(candidate.priority || 0),
+    level: Number(candidate.level || 0),
+    source: candidate.source || "",
+    signature: candidate.signature || "",
+    text: candidate.text || "",
+  }));
+
+  return {
+    task: "Redacta una linea editorial nueva para encabezar un tweet con imagen de marcador final.",
+    hard_facts: {
+      match_status: matchData?.match?.status || "",
+      group: matchData?.competition?.groupLetter || null,
+      matchday: matchData?.competition?.matchdayNumber || null,
+      home: {
+        name: homeName,
+        flag: getFlagEmoji(home.name),
+        score: homeScore,
+      },
+      away: {
+        name: awayName,
+        flag: getFlagEmoji(away.name),
+        score: awayScore,
+      },
+      result: homeScore === awayScore ? "draw" : homeScore > awayScore ? `${homeName} win` : `${awayName} win`,
+      scorers: {
+        home: matchData?.events?.homeScorers || [],
+        away: matchData?.events?.awayScorers || [],
+      },
+    },
+    editorial_priority: {
+      selected_base_headline: context?.headline || "",
+      selected_source: context?.source || "",
+      selected_signature: context?.signature || "",
+      decision: context?.decision || null,
+      signal_summary: context?.signalSummary || null,
+    },
+    tournament_context: summarizeTournamentContext(matchData),
+    stats_context: summarizeStatsForWriter(matchData?.context?.matchStats, homeName, awayName),
+    news_context: summarizeNewsForWriter(matchData?.context?.editorialSignals),
+    candidate_angles: candidates,
+    recent_headlines: normalizeRecentHeadlines(recentEditorialSignatures).slice(0, 10),
+    output_contract: {
+      language: "Spanish",
+      form: "single short editorial sentence",
+      min_words: 12,
+      max_words: 35,
+      no_hashtags: true,
+      no_emojis: true,
+      no_fixed_scoreline: true,
+    },
+  };
+}
+
+function summarizeTournamentContext(matchData) {
+  const tournament = matchData?.context?.tournament || {};
+  const priorGroup = matchData?.context?.priorGroup || {};
+  return {
+    newlyQualified: tournament.newlyQualified || [],
+    newlyGuaranteedFirst: tournament.newlyGuaranteedFirst || [],
+    firstQualifiedThisTournament: Boolean(tournament.firstQualifiedThisTournament),
+    qualifiedBeforeCount: tournament.qualifiedBeforeCount ?? null,
+    qualifiedAfterCount: tournament.qualifiedAfterCount ?? null,
+    groupBefore: {
+      home: priorGroup.homePrior || null,
+      away: priorGroup.awayPrior || null,
+    },
+    groupAfter: {
+      home: priorGroup.homeAfter || null,
+      away: priorGroup.awayAfter || null,
+    },
+    groupOutlook: priorGroup.groupOutlook || null,
+  };
+}
+
+function summarizeNewsForWriter(signals) {
+  return {
+    favoriteSide: signals?.matchup?.favoriteSide || null,
+    favoriteGap: signals?.matchup?.favoriteGap || 0,
+    debutantVsFavorite: Boolean(signals?.matchup?.debutantVsFavorite),
+    defendingChampionSide: signals?.matchup?.defendingChampionSide || null,
+    themes: signals?.news?.themes || {},
+    items: (signals?.news?.relevantItems || []).slice(0, 5).map((item) => ({
+      title: item.title,
+      themes: item.themes || [],
+      teams: item.teams || [],
+    })),
+  };
+}
+
+function summarizeStatsForWriter(matchStats, homeName, awayName) {
+  const rows = flattenStatRows(matchStats).slice(0, 24);
+  const important = [];
+
+  for (const row of rows) {
+    const name = normalizeStatName(row.name);
+    if (!/(xg|expected|shot|disparo|remate|possession|posesion|posesión|big chance|clear chance|ocasion|ocasión|momentum)/i.test(name)) {
+      continue;
+    }
+
+    important.push({
+      stat: row.name,
+      [homeName]: row.home,
+      [awayName]: row.away,
+    });
+  }
+
+  return important.slice(0, 8);
+}
+
+function flattenStatRows(value, rows = []) {
+  if (!value) return rows;
+
+  if (Array.isArray(value)) {
+    for (const item of value) flattenStatRows(item, rows);
+    return rows;
+  }
+
+  if (typeof value !== "object") return rows;
+
+  const name = value.name || value.title || value.key || value.stat;
+  const home = value.home ?? value.homeValue ?? value.home_value;
+  const away = value.away ?? value.awayValue ?? value.away_value;
+  if (name && home !== undefined && away !== undefined) {
+    rows.push({ name: String(name), home, away });
+  }
+
+  for (const nested of Object.values(value)) {
+    if (nested && typeof nested === "object") flattenStatRows(nested, rows);
+  }
+
+  return rows;
+}
+
+function buildValidationRules(matchData, context, recentEditorialSignatures = []) {
+  const homeName = normalizeTeamName(matchData?.teams?.home?.name);
+  const awayName = normalizeTeamName(matchData?.teams?.away?.name);
+  const signature = String(context?.signature || "");
+  const baseHeadline = String(context?.headline || "");
+  const source = String(context?.source || "");
+
+  return {
+    teamNames: [homeName, awayName].filter(Boolean),
+    group: matchData?.competition?.groupLetter || null,
+    requiredNarratives: getRequiredNarratives({ signature, source, baseHeadline }),
+    recentHeadlines: normalizeRecentHeadlines(recentEditorialSignatures),
+    baseHeadline,
+  };
+}
+
+function getRequiredNarratives({ signature, source, baseHeadline }) {
+  const text = `${signature} ${source} ${baseHeadline}`.toLowerCase();
+  const narratives = [];
+
+  if (/qualified|clasific|avanz|siguiente fase|primer clasificado|boleto|first-qualified|guaranteed-top-two/.test(text)) {
+    narratives.push("qualification");
+  }
+  if (/lider|primer lugar|guaranteed-first|group-winner/.test(text)) {
+    narratives.push("group-lead");
+  }
+  if (/elimin|fuera/.test(text)) {
+    narratives.push("elimination");
+  }
+  if (/best-third|mejores terceros|third-place/.test(text)) {
+    narratives.push("third-place-route");
+  }
+  if (/late|90\+|tiempo añadido|minutos finales|ultimo minuto|último minuto/.test(text)) {
+    narratives.push("late-goal");
+  }
+  if (/domin|xg|remates|shots|ocasiones|resisti/.test(text)) {
+    narratives.push("dominance");
+  }
+
+  return Array.from(new Set(narratives));
+}
+
+function validateEditorialHeadline(rawHeadline, rules) {
+  const headline = cleanGeneratedHeadline(rawHeadline);
+  if (!headline) return { ok: false, reason: "empty headline" };
+
+  const words = wordCount(headline);
+  if (words < 8) return { ok: false, reason: "headline is too short" };
+  if (words > 38 || headline.length > 210) return { ok: false, reason: "headline is too long" };
+  if (headline.includes("\n")) return { ok: false, reason: "headline contains multiple lines" };
+  if (/[#]/.test(headline)) return { ok: false, reason: "headline contains hashtags" };
+  if (/[🇦-🇿]/u.test(headline)) return { ok: false, reason: "headline contains emoji flags" };
+  if (BANNED_TEMPLATE_FRAGMENTS.some((fragment) => includesNormalized(headline, fragment))) {
+    return { ok: false, reason: "headline repeats a banned template phrase" };
+  }
+
+  if (!rules.teamNames.some((team) => includesNormalized(headline, team))) {
+    return { ok: false, reason: "headline does not mention either team" };
+  }
+
+  for (const narrative of rules.requiredNarratives || []) {
+    if (!headlineCoversNarrative(headline, narrative)) {
+      return { ok: false, reason: `headline misses required narrative: ${narrative}` };
+    }
+  }
+
+  for (const recent of rules.recentHeadlines || []) {
+    if (isTooSimilar(headline, recent)) {
+      return { ok: false, reason: "headline is too similar to a recent post" };
+    }
+  }
+
+  if (rules.baseHeadline && isTooSimilar(headline, rules.baseHeadline, 0.92)) {
+    return { ok: false, reason: "headline is only a copy of the fallback headline" };
+  }
+
+  return { ok: true, headline };
+}
+
+function headlineCoversNarrative(headline, narrative) {
+  const text = normalizeText(headline);
+  const patterns = {
+    qualification: /(clasific|avanza|avanzar|avanzan|siguiente fase|boleto|pase)/i,
+    "group-lead": /(lider|liderato|primer lugar|grupo|amarra)/i,
+    elimination: /(elimin|fuera)/i,
+    "third-place-route": /(mejores terceros|terceros|aspirar|opciones|espera)/i,
+    "late-goal": /(90\+|tiempo anadido|agregado|minutos finales|ultimo minuto|cierre)/i,
+    dominance: /(domini|remates|ocasiones|xg|resisti|resiste|pese|eficaz)/i,
+  };
+
+  return patterns[narrative]?.test(text) ?? true;
+}
+
+function cleanGeneratedHeadline(value) {
+  return String(value || "")
+    .replace(/^```(?:json|text)?/i, "")
+    .replace(/```$/i, "")
+    .replace(/^["“”']+|["“”']+$/g, "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+}
+
+function normalizeRecentHeadlines(entries = []) {
+  return (entries || [])
+    .map((entry) => (typeof entry === "string" ? entry : entry?.headline))
+    .filter(Boolean)
+    .map((headline) => String(headline).trim())
+    .filter(Boolean);
+}
+
+function isTooSimilar(left, right, threshold = 0.78) {
+  const a = normalizeText(left);
+  const b = normalizeText(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+
+  const leftTokens = tokenSet(a);
+  const rightTokens = tokenSet(b);
+  if (!leftTokens.size || !rightTokens.size) return false;
+
+  let overlap = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) overlap += 1;
+  }
+
+  return overlap / Math.max(leftTokens.size, rightTokens.size) >= threshold;
+}
+
+function tokenSet(value) {
+  return new Set(
+    normalizeText(value)
+      .split(/\s+/)
+      .filter((token) => token.length > 2),
+  );
+}
+
+function includesNormalized(text, fragment) {
+  return normalizeText(text).includes(normalizeText(fragment));
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w+']+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeStatName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wordCount(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+async function safeResponseText(response) {
+  try {
+    return await response.text();
+  } catch (error) {
+    return error.message;
+  }
+}
+
+module.exports = {
+  buildWriterPayload,
+  validateEditorialHeadline,
+  writeEditorialHeadline,
+};
