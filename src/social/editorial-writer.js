@@ -14,6 +14,9 @@ const BANNED_TEMPLATE_FRAGMENTS = [
   "suma un punto historico ante una de las candidatas al titulo",
   "suma un punto histórico frente a una de las candidatas al título",
   "suma un punto historico frente a una de las candidatas al titulo",
+  "en un partido de alto ritmo",
+  "partido de alto ritmo",
+  "partido abierto y de mucho ritmo",
 ];
 
 function isEditorialAiEnabled() {
@@ -293,6 +296,7 @@ function buildWriterPayload(matchData, context, recentEditorialSignatures = []) 
       signal_summary: context?.signalSummary || null,
     },
     tournament_context: summarizeTournamentContext(matchData),
+    player_milestones: summarizePlayerMilestones(matchData),
     stats_context: summarizeStatsForWriter(matchData?.context?.matchStats, homeName, awayName),
     news_context: summarizeNewsForWriter(matchData?.context?.editorialSignals),
     candidate_angles: candidates,
@@ -307,6 +311,15 @@ function buildWriterPayload(matchData, context, recentEditorialSignatures = []) 
       no_fixed_scoreline: true,
     },
   };
+}
+
+function summarizePlayerMilestones(matchData) {
+  return (matchData?.context?.playerMilestones?.facts || []).slice(0, 5).map((fact) => ({
+    priority: fact.priority || null,
+    signature: fact.signature || "",
+    text: fact.text || "",
+    playerKey: fact.playerKey || "",
+  }));
 }
 
 function summarizeTournamentContext(matchData) {
@@ -418,6 +431,9 @@ function getRequiredNarratives({ signature, source, baseHeadline }) {
   if (/elimin|fuera/.test(text)) {
     narratives.push("elimination");
   }
+  if (/record|récord|maximo goleador|maximo anotador|seis mundiales|marca historica|player-all-time|player-first-to-score/.test(text)) {
+    narratives.push("record");
+  }
   if (/best-third|mejores terceros|third-place/.test(text)) {
     narratives.push("third-place-route");
   }
@@ -474,6 +490,7 @@ function headlineCoversNarrative(headline, narrative) {
     qualification: /(clasific|avanza|avanzar|avanzan|siguiente fase|boleto|pase)/i,
     "group-lead": /(lider|liderato|primer lugar|grupo|amarra)/i,
     elimination: /(elimin|fuera)/i,
+    record: /(record|récord|marca|histor|maximo|maxima|goleador|anotar en seis mundiales|seis mundiales)/i,
     "third-place-route": /(mejores terceros|terceros|aspirar|opciones|espera)/i,
     "late-goal": /(90\+|tiempo anadido|agregado|minutos finales|ultimo minuto|cierre)/i,
     dominance: /(domini|remates|ocasiones|xg|resisti|resiste|pese|eficaz)/i,

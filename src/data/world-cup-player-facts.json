@@ -1,0 +1,17 @@
+{
+  "lionel messi": {
+    "displayName": "Messi",
+    "team": "argentina",
+    "aliases": ["lionel messi", "l. messi", "messi"],
+    "worldCupGoalsBefore2026": 13,
+    "allTimeWorldCupGoalRecordBefore2026": 16
+  },
+  "cristiano ronaldo": {
+    "displayName": "Cristiano Ronaldo",
+    "team": "portugal",
+    "aliases": ["cristiano ronaldo", "c. ronaldo", "ronaldo"],
+    "worldCupGoalsBefore2026": 8,
+    "worldCupEditionsScoredBefore2026": [2006, 2010, 2014, 2018, 2022],
+    "firstPlayerToScoreInSixWorldCups": true
+  }
+}

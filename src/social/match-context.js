@@ -76,6 +76,7 @@ function buildFactCandidates(matchData) {
   const decisiveLateGoal = getDecisiveLateGoalStory(matchData);
   const candidates = [];
 
+  pushPlayerMilestoneCandidates(candidates, matchData.context?.playerMilestones);
   const isDraw = homeScore === awayScore;
   const winner = homeScore > awayScore ? home : away;
   const loser = homeScore > awayScore ? away : home;
@@ -93,6 +94,17 @@ function buildFactCandidates(matchData) {
   const loserProfile = homeScore > awayScore ? awayProfile : homeProfile;
   const winnerAfter = homeScore > awayScore ? homeAfter : awayAfter;
   const loserAfter = homeScore > awayScore ? awayAfter : homeAfter;
+
+  pushTeamHistoricalMilestoneCandidates(candidates, {
+    homeName,
+    awayName,
+    homeFacts,
+    awayFacts,
+    homeAfter,
+    awayAfter,
+    group,
+    matchday,
+  });
 
   pushFirstGoalCandidate(candidates, homeName, homeScore, homeFacts, homePrior);
   pushFirstGoalCandidate(candidates, awayName, awayScore, awayFacts, awayPrior);
@@ -483,7 +495,7 @@ function getExceptionalSecondaryClause(candidate) {
     return minute ? `con un gol en el ${minute}` : "en el cierre";
   }
 
-  if (source === "editorial-match-tempo") return "en un partido de alto ritmo";
+  if (source === "editorial-match-tempo") return "";
   if (source === "editorial-hierarchy") return "con un resultado de peso";
   if (source === "editorial-stats-dominance") return "tras resistir el dominio rival";
   if (source.includes("advanced-stats:efficiency")) {
@@ -917,6 +929,46 @@ function projectStanding(prior, goalsFor, goalsAgainst) {
   return row;
 }
 
+function pushPlayerMilestoneCandidates(candidates, milestoneContext) {
+  for (const fact of milestoneContext?.facts || []) {
+    if (!fact?.text) continue;
+    candidates.push({
+      priority: Number(fact.priority || 128),
+      level: Number(fact.level || 1),
+      source: fact.source || "editorial-player-milestone",
+      signature: fact.signature || getEditorialSignature(fact.text),
+      text: fact.text,
+      milestone: fact,
+    });
+  }
+}
+
+function pushTeamHistoricalMilestoneCandidates(candidates, context) {
+  const { homeName, awayName, homeFacts, awayFacts, homeAfter, awayAfter, group, matchday } = context;
+  if (Number(matchday || 0) !== 3) return;
+
+  const teams = [
+    { name: homeName, facts: homeFacts, after: homeAfter },
+    { name: awayName, facts: awayFacts, after: awayAfter },
+  ];
+
+  for (const team of teams) {
+    const maxPointsBefore = Number(team.facts?.maxGroupStagePointsBefore2026);
+    if (!Number.isFinite(maxPointsBefore) || maxPointsBefore >= 9) continue;
+    if (Number(team.after?.points || 0) !== 9) continue;
+
+    candidates.push({
+      priority: 127,
+      level: 1,
+      source: "curated-world-cup-team-facts",
+      signature: "team-first-perfect-group-stage",
+      text: group
+        ? `${team.name} cierra el Grupo ${group} con nueve puntos por primera vez en su historia mundialista.`
+        : `${team.name} cierra la fase de grupos con nueve puntos por primera vez en su historia mundialista.`,
+    });
+  }
+}
+
 function pushHighScoringMatchCandidate(candidates, context) {
   const { homeName, awayName, homeScore, awayScore, totalGoals, isDraw, winnerName, loserName, group } = context;
   const bothTeamsMultipleGoals = homeScore >= 2 && awayScore >= 2;
@@ -930,7 +982,7 @@ function pushHighScoringMatchCandidate(candidates, context) {
     candidates.push({
       priority: totalGoals >= 6 ? 93 : 91,
       source: "editorial-match-tempo",
-      text: `${homeName} y ${awayName} firmaron un empate de alto ritmo${groupPhrase}.`,
+      text: `${homeName} y ${awayName} firmaron un empate con margen mínimo y mucho intercambio${groupPhrase}.`,
     });
     return;
   }
@@ -938,7 +990,7 @@ function pushHighScoringMatchCandidate(candidates, context) {
   candidates.push({
     priority: totalGoals >= 6 ? 93 : 91,
     source: "editorial-match-tempo",
-    text: `${winnerName} venció a ${loserName} en un partido abierto y de mucho ritmo${groupPhrase}.`,
+    text: `${winnerName} venció a ${loserName} en un cruce de ida y vuelta${groupPhrase}.`,
   });
 }
 

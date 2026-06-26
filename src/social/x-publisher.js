@@ -12,6 +12,10 @@ function getPostMode() {
   return process.env.X_POST_MODE || "manual";
 }
 
+function isEditorialAiRequired() {
+  return process.env.EDITORIAL_AI_REQUIRED !== "false";
+}
+
 function hasXCredentials() {
   return Boolean(
     process.env.X_API_KEY &&
@@ -104,6 +108,16 @@ async function publishFinalScorePost({ matchData, imagePath, recentEditorialSign
 
   if (mode !== "auto") {
     throw new Error(`Unknown X_POST_MODE: ${mode}`);
+  }
+
+  if (isEditorialAiRequired() && !headlineOverride && context.aiWriter?.used !== true) {
+    return {
+      published: false,
+      mode,
+      text,
+      editorialContext: context,
+      reason: "Auto post blocked because the editorial AI did not produce the final headline.",
+    };
   }
 
   const client = getXClient();

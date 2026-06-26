@@ -19,6 +19,7 @@ const {
 } = require("./social/editorial-context-cache");
 const { buildEditorialSignalsForMatchData, summarizeEditorialSignals } = require("./social/editorial-signals");
 const { runEditorialResearch, shouldRunEditorialResearch } = require("./social/editorial-research");
+const { buildPlayerMilestoneContext } = require("./social/player-milestones");
 const { publishFinalScorePost, verifyXPublisherAccount } = require("./social/x-publisher");
 const { maybeProcessTopScorers } = require("./top-scorers/top-scorers-job");
 const bsd = require("../work/tools/bsd_match_adapter");
@@ -97,12 +98,18 @@ async function renderEvent(eventId, options = {}) {
   const publishStartedAt = nowMs();
   const [uploadSettled, socialSettled] = await Promise.allSettled([
     uploadGeneratedImage(outputPath, outputName),
-    publishFinalScorePost({
-      matchData,
-      imagePath: outputPath,
-      recentEditorialSignatures: options.recentEditorialSignatures,
-      headlineOverride: options.headlineOverride,
-    }),
+    options.skipSocialPost
+      ? Promise.resolve({
+          published: false,
+          mode: "preview",
+          reason: "Social posting skipped for this render.",
+        })
+      : publishFinalScorePost({
+          matchData,
+          imagePath: outputPath,
+          recentEditorialSignatures: options.recentEditorialSignatures,
+          headlineOverride: options.headlineOverride,
+        }),
   ]);
 
   const uploadResult =
@@ -185,6 +192,7 @@ async function enrichCompetitionContext(matchData, contextEvents) {
       priorGroup: buildPriorGroupContext(matchData, events),
       teamForm: buildTeamFormContext(matchData, events),
       tournament: buildTournamentContext(matchData, events),
+      playerMilestones: await buildPlayerMilestoneContext(matchData, events, bsd.fetchEventIncidents),
     };
   } catch (error) {
     console.error(`Competition context unavailable: ${error.message}`);
@@ -203,7 +211,9 @@ async function runStartupJob() {
   if (!eventId) return;
 
   try {
-    await renderEvent(eventId);
+    await renderEvent(eventId, {
+      skipSocialPost: process.env.RUN_ON_START_CAN_POST !== "true",
+    });
   } catch (error) {
     console.error(`Startup render failed: ${error.message}`);
   }
@@ -338,6 +348,17 @@ function getStrongMonitorDelayMinutes() {
   return Number(process.env.SECOND_HALF_STRONG_MONITOR_MINUTES || "40");
 }
 
+function hasFinalPostAttempt(record = {}) {
+  return Boolean(
+    record.processedAt ||
+      record.xPublishAttemptedAt ||
+      record.xPublished ||
+      record.tweetUrl ||
+      record.publishLockId ||
+      record.renderCompletedAt,
+  );
+}
+
 function addDays(date, days) {
   const copy = new Date(date);
   copy.setUTCDate(copy.getUTCDate() + days);
@@ -429,16 +450,22 @@ async function processFinishedEvent(event, state, contextEvents) {
   const eventId = String(event.id);
   const record = state.matches[eventId] || {};
 
-  if (record.processedAt) {
-    console.log(`Skipping BSD event ${eventId}; already processed at ${record.processedAt}`);
+  if (hasFinalPostAttempt(record)) {
+    console.log(
+      `Skipping BSD event ${eventId}; final post already attempted ` +
+        `(${record.processedAt || record.xPublishAttemptedAt || record.renderCompletedAt || record.publishLockId}).`,
+    );
     return state;
   }
 
+  const lockId = `${eventId}:${Date.now()}`;
   state.matches[eventId] = {
     ...record,
     status: event.status,
     finalDetectedAt: record.finalDetectedAt || new Date().toISOString(),
     renderStartedAt: new Date().toISOString(),
+    xPublishAttemptedAt: new Date().toISOString(),
+    publishLockId: lockId,
   };
   await saveMonitorState(state);
 

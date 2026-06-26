@@ -15,6 +15,7 @@ function baseMatch({
   matchStats = null,
   tournament = null,
   priorGroup = null,
+  playerMilestones = null,
   newsDigest = null,
   homeScorers = [],
   awayScorers = [],
@@ -51,6 +52,7 @@ function baseMatch({
       matchStats,
       tournament,
       priorGroup,
+      playerMilestones,
     },
   };
 
@@ -384,6 +386,84 @@ runCase({
   },
   expectIncludes: ["Paraguay"],
   rejectIncludes: ["se mete de lleno en la pelea por avanzar", "consigue tres puntos clave"],
+});
+
+runCase({
+  name: "team historic nine points beats generic leader angle",
+  matchData: baseMatch({
+    eventId: 9001,
+    home: "Czechia",
+    away: "Mexico",
+    homeScore: 0,
+    awayScore: 3,
+    group: "A",
+    matchday: 3,
+    priorGroup: {
+      homePrior: { played: 2, wins: 0, draws: 0, losses: 2, points: 0, goalsFor: 1, goalsAgainst: 5 },
+      awayPrior: { played: 2, wins: 2, draws: 0, losses: 0, points: 6, goalsFor: 4, goalsAgainst: 1 },
+      homeAfter: { played: 3, wins: 0, draws: 0, losses: 3, points: 0, goalsFor: 1, goalsAgainst: 8 },
+      awayAfter: { played: 3, wins: 3, draws: 0, losses: 0, points: 9, goalsFor: 7, goalsAgainst: 1 },
+      groupOutlook: {
+        home: { remainingGames: 0 },
+        away: { remainingGames: 0, guaranteedTopTwo: true, guaranteedFirst: true },
+      },
+    },
+  }),
+  expectSignature: "team-first-perfect-group-stage",
+  expectIncludes: ["México", "nueve puntos", "primera vez"],
+  rejectIncludes: ["superioridad", "alto ritmo"],
+});
+
+runCase({
+  name: "player all-time scorer record beats match description",
+  matchData: baseMatch({
+    eventId: 9002,
+    home: "Argentina",
+    away: "Ghana",
+    homeScore: 2,
+    awayScore: 1,
+    group: "J",
+    matchday: 2,
+    playerMilestones: {
+      facts: [
+        {
+          priority: 132,
+          level: 1,
+          source: "editorial-player-milestone",
+          signature: "player-all-time-world-cup-goal-record",
+          text: "Messi se convierte en el máximo goleador histórico de los Mundiales.",
+        },
+      ],
+    },
+  }),
+  expectSignature: "player-all-time-world-cup-goal-record",
+  expectIncludes: ["Messi", "máximo goleador histórico"],
+});
+
+runCase({
+  name: "six world cups scoring record beats generic Portugal win",
+  matchData: baseMatch({
+    eventId: 9003,
+    home: "Portugal",
+    away: "Tunisia",
+    homeScore: 1,
+    awayScore: 0,
+    group: "F",
+    matchday: 2,
+    playerMilestones: {
+      facts: [
+        {
+          priority: 131,
+          level: 1,
+          source: "editorial-player-milestone",
+          signature: "player-first-to-score-in-six-world-cups",
+          text: "Cristiano Ronaldo se convierte en el primer jugador en anotar en seis Mundiales distintos.",
+        },
+      ],
+    },
+  }),
+  expectSignature: "player-first-to-score-in-six-world-cups",
+  expectIncludes: ["Cristiano Ronaldo", "seis Mundiales"],
 });
 
 console.log("Editorial smoke tests passed.");

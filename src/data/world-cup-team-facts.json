@@ -27,7 +27,7 @@
   "japan": { "firstWorldCupAppearance": 1998, "bestFinish": "round_of_16", "worldCupTitlesBefore2026": 0 },
   "jordan": { "firstWorldCupAppearance": 2026, "bestFinish": "debut", "worldCupTitlesBefore2026": 0, "worldCupWinsBefore2026": 0, "worldCupGoalsBefore2026": 0 },
   "jordania": { "firstWorldCupAppearance": 2026, "bestFinish": "debut", "worldCupTitlesBefore2026": 0, "worldCupWinsBefore2026": 0, "worldCupGoalsBefore2026": 0 },
-  "mexico": { "firstWorldCupAppearance": 1930, "bestFinish": "quarterfinal", "worldCupTitlesBefore2026": 0 },
+  "mexico": { "firstWorldCupAppearance": 1930, "bestFinish": "quarterfinal", "worldCupTitlesBefore2026": 0, "maxGroupStagePointsBefore2026": 7 },
   "morocco": { "firstWorldCupAppearance": 1970, "bestFinish": "semifinal", "worldCupTitlesBefore2026": 0 },
   "netherlands": { "firstWorldCupAppearance": 1934, "bestFinish": "runner_up", "worldCupTitlesBefore2026": 0 },
   "new zealand": { "firstWorldCupAppearance": 1982, "bestFinish": "group_stage", "worldCupTitlesBefore2026": 0, "worldCupWinsBefore2026": 0 },
