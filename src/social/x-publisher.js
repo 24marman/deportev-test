@@ -5,6 +5,10 @@ const { getInternalContext } = require("./match-context");
 const { writeEditorialHeadline } = require("./editorial-writer");
 
 function getPostMode() {
+  if (process.env.X_POSTING_ENABLED !== "true") {
+    return "paused";
+  }
+
   return process.env.X_POST_MODE || "manual";
 }
 

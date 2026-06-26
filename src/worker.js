@@ -26,13 +26,7 @@ const bsd = require("../work/tools/bsd_match_adapter");
 const generatedDir = path.join("outputs", "generated");
 const DEFAULT_AUTOPOST_NOT_BEFORE = "2026-06-14T23:00:00.000Z";
 const DEFAULT_GROUP_STAGE_CONTEXT_START_DATE = "2026-06-11";
-const MANUAL_REPOST_JOBS = [
-  {
-    key: "2026-06-21-uruguay-cabo-verde-corrected-headline",
-    eventId: "8325",
-    headline: "Cabo Verde le cerró el camino a Uruguay y convierte el empate sin goles en un resultado histórico.",
-  },
-];
+const MANUAL_REPOST_JOBS = [];
 
 function slug(value) {
   return String(value || "")
@@ -59,6 +53,10 @@ function nowMs() {
 
 function logDuration(label, startedAt) {
   console.log(`${label} completed in ${Date.now() - startedAt}ms.`);
+}
+
+function isBotEnabled() {
+  return process.env.BOT_ENABLED === "true";
 }
 
 async function renderEvent(eventId, options = {}) {
@@ -194,6 +192,11 @@ async function enrichCompetitionContext(matchData, contextEvents) {
 }
 
 async function runStartupJob() {
+  if (!isBotEnabled()) {
+    console.log("Bot disabled. Skipping startup render job.");
+    return;
+  }
+
   if (process.env.RUN_ON_START !== "true") return;
 
   const eventId = process.env.RUN_ON_START_EVENT_ID;
@@ -207,18 +210,11 @@ async function runStartupJob() {
 }
 
 function shouldRunManualRepostJobs() {
-  if (process.env.MANUAL_REPOSTS_ENABLED === "false") return false;
-  if (process.env.MANUAL_REPOSTS_ENABLED === "true") return true;
-
-  return Boolean(
-    process.env.NODE_ENV === "production" ||
-      process.env.RAILWAY_ENVIRONMENT ||
-      process.env.RAILWAY_PROJECT_ID ||
-      process.env.RAILWAY_SERVICE_ID,
-  );
+  return process.env.MANUAL_REPOSTS_ENABLED === "true";
 }
 
 async function runManualRepostJobs() {
+  if (!isBotEnabled()) return;
   if (!shouldRunManualRepostJobs()) return;
 
   let state = await loadMonitorState();
@@ -648,6 +644,11 @@ async function logXAccountStatus() {
 }
 
 async function runMonitorLoop() {
+  if (!isBotEnabled()) {
+    console.log("Bot disabled. Set BOT_ENABLED=true to run the monitor.");
+    return;
+  }
+
   if (process.env.MONITOR_ENABLED !== "true") {
     console.log("Monitor disabled. Set MONITOR_ENABLED=true in Railway when ready.");
     return;
