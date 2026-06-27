@@ -139,6 +139,7 @@ async function main() {
       EDITORIAL_AI_PROVIDER: "openai",
       EDITORIAL_AI_ENABLED: "true",
       EDITORIAL_AI_MODEL: "test-model",
+      EDITORIAL_REASONER_ENABLED: "false",
     },
     async () => {
       const accepted = await writeEditorialHeadline({
@@ -216,6 +217,7 @@ async function main() {
       EDITORIAL_AI_ENABLED: "true",
       EDITORIAL_AI_MODEL: "",
       GEMINI_TEXT_MODEL: "test-gemini-model",
+      EDITORIAL_REASONER_ENABLED: "false",
     },
     async () => {
       const accepted = await writeEditorialHeadline({
@@ -232,6 +234,41 @@ async function main() {
       assert.strictEqual(accepted.aiWriter.model, "test-gemini-model", "Gemini model should be marked in metadata");
       assert(accepted.headline.includes("Paraguay"), "accepted Gemini headline should mention the team");
       assert(accepted.headline.includes("Grupo D"), "accepted Gemini headline should keep the group consequence");
+    },
+  );
+
+  await withEnv(
+    {
+      OPENAI_API_KEY: "",
+      GEMINI_API_KEY: "test-gemini-key",
+      EDITORIAL_AI_PROVIDER: "gemini",
+      EDITORIAL_AI_ENABLED: "true",
+      EDITORIAL_AI_MODEL: "",
+      GEMINI_TEXT_MODEL: "test-gemini-model",
+      EDITORIAL_REASONER_ENABLED: "true",
+    },
+    async () => {
+      const accepted = await writeEditorialHeadline({
+        matchData,
+        context,
+        recentEditorialSignatures: [],
+        fetchImpl: fakeGeminiResponse([
+          JSON.stringify({
+            primary_angle: "dominance",
+            secondary_angle: "qualification",
+            must_include_narratives: ["dominance", "qualification"],
+            rationale: "Paraguay won despite Turkey creating better chances, so the best short angle combines resistance with group consequence.",
+            headline: "Paraguay resistió las ocasiones más claras de Turquía y mantiene viva su ruta para avanzar en el Grupo D.",
+          }),
+        ]),
+      });
+
+      assert.strictEqual(accepted.aiWriter.used, true, "valid reasoned Gemini headline should be used");
+      assert.strictEqual(accepted.aiWriter.reasonerUsed, true, "reasoner path should be marked in metadata");
+      assert.strictEqual(accepted.aiWriter.provider, "gemini", "Gemini provider should be marked in reasoner metadata");
+      assert(accepted.headline.includes("Paraguay"), "reasoned headline should mention the team");
+      assert(accepted.headline.includes("avanzar"), "reasoned headline should keep the group consequence");
+      assert(/ocasiones|resisti/i.test(accepted.headline), "reasoned headline should keep the dominance context it selected");
     },
   );
 

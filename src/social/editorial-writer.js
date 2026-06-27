@@ -67,6 +67,58 @@ async function writeEditorialHeadline({
   const provider = getEditorialProvider();
   let lastError = "";
 
+  if (isEditorialReasonerEnabled()) {
+    try {
+      const reasoned = await requestAiEditorialDecision({
+        provider,
+        payload,
+        feedback: "",
+        fetchImpl,
+        timeoutMs,
+      });
+      const reasonerRules = buildReasonerValidationRules(validationRules, context, reasoned);
+      const validation = validateEditorialHeadline(reasoned.headline, reasonerRules);
+
+      if (validation.ok) {
+        return withWriterMeta(
+          {
+            ...context,
+            headline: validation.headline,
+            source: `${provider}-editorial-reasoner:${getEditorialModel(provider)}+${context.source}`,
+            decision: {
+              ...(context.decision || {}),
+              editorialReasoner: {
+                used: true,
+                provider,
+                model: getEditorialModel(provider),
+                primaryAngle: reasoned.primary_angle || "",
+                secondaryAngle: reasoned.secondary_angle || "",
+                mustIncludeNarratives: reasoned.must_include_narratives || [],
+                rationale: reasoned.rationale || "",
+                baseHeadline: context.headline,
+              },
+            },
+          },
+          {
+            used: true,
+            provider,
+            model: getEditorialModel(provider),
+            reasonerUsed: true,
+            primaryAngle: reasoned.primary_angle || "",
+            secondaryAngle: reasoned.secondary_angle || "",
+            mustIncludeNarratives: reasoned.must_include_narratives || [],
+            rationale: reasoned.rationale || "",
+            baseHeadline: context.headline,
+          },
+        );
+      }
+
+      lastError = `reasoner rejected: ${validation.reason}`;
+    } catch (error) {
+      lastError = `reasoner failed: ${error.message}`;
+    }
+  }
+
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const generated = await requestAiHeadline({
@@ -193,19 +245,82 @@ function pickMemorySafeFallback(context, validationRules) {
   };
 }
 
-async function requestAiHeadline({ provider, payload, feedback, fetchImpl, timeoutMs }) {
+async function requestAiHeadline({
+  provider,
+  payload,
+  feedback,
+  fetchImpl,
+  timeoutMs,
+  systemPrompt = buildSystemPrompt(),
+  maxTokens = 90,
+  responseMimeType = "text/plain",
+}) {
   if (provider === "gemini") {
-    return requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs });
+    return requestGeminiHeadline({
+      payload,
+      feedback,
+      fetchImpl,
+      timeoutMs,
+      systemPrompt,
+      maxTokens,
+      responseMimeType,
+    });
   }
 
   if (provider === "openai") {
-    return requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs });
+    return requestOpenAIHeadline({
+      payload,
+      feedback,
+      fetchImpl,
+      timeoutMs,
+      systemPrompt,
+      maxTokens,
+    });
   }
 
   throw new Error("No editorial AI provider is configured.");
 }
 
-async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }) {
+async function requestAiEditorialDecision({ provider, payload, feedback, fetchImpl, timeoutMs }) {
+  const reasonerPayload = {
+    ...payload,
+    task: "Actua como editor jefe: decide la noticia mas relevante del partido y redacta el titular final.",
+    relevance_contract: {
+      do_not_follow_fixed_priority: true,
+      choose_by_editorial_relevance: true,
+      combine_up_to_two_angles_when_both_matter: true,
+      never_invent_facts: true,
+    },
+    output_schema: {
+      primary_angle: "classification | group-lead | elimination | record | historic-milestone | upset | late-goal | high-scoring-match | dominance | poor-match | day-context | scoreline | other",
+      secondary_angle: "same list or null",
+      must_include_narratives: "array of required narratives, e.g. qualification, group-lead, elimination, record, late-goal, dominance, third-place-route",
+      rationale: "short explanation of why this angle matters most",
+      headline: "final Spanish headline, 15-35 words, no hashtags, no emojis",
+    },
+  };
+  const raw = await requestAiHeadline({
+    provider,
+    payload: reasonerPayload,
+    feedback,
+    fetchImpl,
+    timeoutMs: Math.max(Number(timeoutMs || DEFAULT_TIMEOUT_MS), Number(process.env.EDITORIAL_REASONER_TIMEOUT_MS || 4500)),
+    systemPrompt: buildReasonerPrompt(),
+    maxTokens: 420,
+    responseMimeType: provider === "gemini" ? "application/json" : "text/plain",
+  });
+
+  return parseEditorialDecision(raw);
+}
+
+async function requestOpenAIHeadline({
+  payload,
+  feedback,
+  fetchImpl,
+  timeoutMs,
+  systemPrompt = buildSystemPrompt(),
+  maxTokens = 90,
+}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || DEFAULT_TIMEOUT_MS)));
 
@@ -220,11 +335,10 @@ async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }
       body: JSON.stringify({
         model: getEditorialModel("openai"),
         temperature: Number(process.env.EDITORIAL_AI_TEMPERATURE || 0.72),
-        max_tokens: 90,
         messages: [
           {
             role: "system",
-            content: buildSystemPrompt(),
+            content: systemPrompt,
           },
           {
             role: "user",
@@ -238,6 +352,7 @@ async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }
             ),
           },
         ],
+        max_tokens: maxTokens,
       }),
     });
 
@@ -253,7 +368,15 @@ async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }
   }
 }
 
-async function requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs }) {
+async function requestGeminiHeadline({
+  payload,
+  feedback,
+  fetchImpl,
+  timeoutMs,
+  systemPrompt = buildSystemPrompt(),
+  maxTokens = 90,
+  responseMimeType = "text/plain",
+}) {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is missing.");
@@ -273,7 +396,7 @@ async function requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs }
       },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: buildSystemPrompt() }],
+          parts: [{ text: systemPrompt }],
         },
         contents: [
           {
@@ -294,8 +417,8 @@ async function requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs }
         ],
         generationConfig: {
           temperature: Number(process.env.EDITORIAL_AI_TEMPERATURE || 0.72),
-          maxOutputTokens: 90,
-          responseMimeType: "text/plain",
+          maxOutputTokens: maxTokens,
+          responseMimeType,
         },
       }),
     });
@@ -347,6 +470,10 @@ function getEditorialModel(provider = getEditorialProvider()) {
   return process.env.EDITORIAL_AI_MODEL || process.env.OPENAI_TEXT_MODEL || DEFAULT_OPENAI_MODEL;
 }
 
+function isEditorialReasonerEnabled() {
+  return process.env.EDITORIAL_REASONER_ENABLED !== "false";
+}
+
 function buildSystemPrompt() {
   return [
     "Eres un editor deportivo para una app moderna de futbol.",
@@ -361,6 +488,19 @@ function buildSystemPrompt() {
     "No inventes datos. Usa exclusivamente los hechos enviados.",
     "No repitas ni parafrasees titulares recientes. Evita frases de plantilla.",
     "No uses estas frases: consigue tres puntos clave, suma tres puntos, tres puntos vitales, suma tres puntos para la tabla, con una victoria clara, suma un punto histórico ante una de las candidatas al título.",
+  ].join("\n");
+}
+
+function buildReasonerPrompt() {
+  return [
+    "Eres el editor jefe de una app moderna de futbol. Tu trabajo NO es aplicar una regla fija.",
+    "Debes razonar como periodista deportivo: identifica la noticia mas importante que deja el partido para la audiencia.",
+    "Evalua todos los angulos disponibles: tabla, clasificacion, eliminacion, liderato, record, hito historico, sorpresa, gol tardio, remontada, partido de muchos goles, dominio estadistico, mal partido, contexto del dia y contexto de selecciones.",
+    "A veces la tabla manda; a veces manda un record; a veces manda un partido historico; a veces dos angulos tienen peso parecido y deben convivir en una sola frase.",
+    "Si hay clasificacion, eliminacion, liderato asegurado o record historico, solo puedes omitirlo si otro hecho de igual o mayor peso aparece claramente en los datos; si caben ambos, combinalos.",
+    "No inventes. Usa exclusivamente los datos del payload.",
+    "No redactes con plantillas ni frases repetidas. No uses 'suma tres puntos' ni 'en un partido de alto ritmo'.",
+    "Devuelve SOLO JSON valido, sin markdown.",
   ].join("\n");
 }
 
@@ -552,6 +692,148 @@ function buildValidationRules(matchData, context, recentEditorialSignatures = []
     recentHeadlines: normalizeRecentHeadlines(recentEditorialSignatures),
     baseHeadline,
   };
+}
+
+function buildReasonerValidationRules(baseRules, context, reasoned) {
+  const requiredNarratives = new Set();
+
+  for (const narrative of getHighImpactNarratives(context)) {
+    requiredNarratives.add(narrative);
+  }
+
+  for (const narrative of normalizeNarrativeList(reasoned?.must_include_narratives)) {
+    requiredNarratives.add(narrative);
+  }
+
+  return {
+    ...baseRules,
+    requiredNarratives: Array.from(requiredNarratives),
+  };
+}
+
+function getHighImpactNarratives(context) {
+  const facts = (context?.facts || []).filter((fact) => fact?.text || fact?.signature || fact?.source);
+  if (!facts.length) {
+    return getRequiredNarratives({
+      signature: context?.signature || "",
+      source: context?.source || "",
+      baseHeadline: context?.headline || "",
+    });
+  }
+
+  const highImpact = facts.filter((fact) => {
+    const level = Number(fact.level || 0);
+    const priority = Number(fact.priority || 0);
+    const text = `${fact.signature || ""} ${fact.source || ""} ${fact.text || ""}`.toLowerCase();
+    const absoluteSignal = /(qualified|clasific|elimin|guaranteed-first|group-winner|primer lugar|liderato|record|récord|maximo goleador|maximo anotador|seis mundiales|marca historica|first-qualified|boleto|siguiente fase)/i.test(text);
+    return absoluteSignal && (level === 1 || priority >= 96);
+  });
+
+  const narratives = [];
+  for (const fact of highImpact) {
+    narratives.push(
+      ...getRequiredNarratives({
+        signature: fact.signature || "",
+        source: fact.source || "",
+        baseHeadline: fact.text || "",
+      }),
+    );
+  }
+
+  return Array.from(new Set(narratives));
+}
+
+function parseEditorialDecision(raw) {
+  const cleaned = String(raw || "")
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (error) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new Error(`Reasoner did not return JSON: ${cleaned.slice(0, 120)}`);
+    }
+    parsed = JSON.parse(match[0]);
+  }
+
+  const decision = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (!decision || typeof decision !== "object") {
+    throw new Error("Reasoner returned an invalid editorial decision.");
+  }
+
+  const headline = cleanGeneratedHeadline(decision.headline || decision.text || decision.titular);
+  if (!headline) {
+    throw new Error("Reasoner returned JSON without a headline.");
+  }
+
+  return {
+    primary_angle: String(decision.primary_angle || decision.primaryAngle || decision.angle || "").trim(),
+    secondary_angle: String(decision.secondary_angle || decision.secondaryAngle || "").trim(),
+    must_include_narratives: normalizeNarrativeList(
+      decision.must_include_narratives || decision.mustIncludeNarratives || decision.required_narratives || [],
+    ),
+    rationale: String(decision.rationale || decision.reason || decision.why || "").trim(),
+    headline,
+  };
+}
+
+function normalizeNarrativeList(value) {
+  const entries = Array.isArray(value) ? value : String(value || "").split(/[,;|]/);
+  const aliases = {
+    classification: "qualification",
+    classified: "qualification",
+    qualified: "qualification",
+    clasificacion: "qualification",
+    clasificación: "qualification",
+    clasifica: "qualification",
+    avance: "qualification",
+    leader: "group-lead",
+    liderato: "group-lead",
+    liderazgo: "group-lead",
+    "primer lugar": "group-lead",
+    elimination: "elimination",
+    eliminacion: "elimination",
+    eliminación: "elimination",
+    record: "record",
+    récord: "record",
+    milestone: "record",
+    hito: "record",
+    "historic-milestone": "record",
+    late: "late-goal",
+    "late goal": "late-goal",
+    "late-goal": "late-goal",
+    dominance: "dominance",
+    dominio: "dominance",
+    "third place": "third-place-route",
+    "third-place": "third-place-route",
+    "third-place-route": "third-place-route",
+    "mejores terceros": "third-place-route",
+  };
+
+  return Array.from(
+    new Set(
+      entries
+        .map((entry) => normalizeText(entry).replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .map((entry) => aliases[entry] || entry.replace(/\s+/g, "-"))
+        .filter((entry) =>
+          [
+            "qualification",
+            "group-lead",
+            "elimination",
+            "record",
+            "third-place-route",
+            "late-goal",
+            "dominance",
+          ].includes(entry),
+        ),
+    ),
+  );
 }
 
 function getRequiredNarratives({ signature, source, baseHeadline }) {
