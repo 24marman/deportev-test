@@ -308,6 +308,9 @@ function buildFactCandidates(matchData) {
     winnerKey,
     loserKey,
     isDraw,
+    homeScore,
+    awayScore,
+    totalGoals,
     matchday,
     group,
     homeAfter,
@@ -1709,6 +1712,9 @@ function pushGroupStakesCandidates(candidates, context) {
     winnerName,
     loserName,
     isDraw,
+    homeScore,
+    awayScore,
+    totalGoals,
     matchday,
     group,
     homeAfter,
@@ -1742,6 +1748,9 @@ function pushGroupStakesCandidates(candidates, context) {
     pushDrawGroupOutlookCandidates(candidates, {
       homeName,
       awayName,
+      homeScore,
+      awayScore,
+      totalGoals,
       group,
       matchday,
       groupOutlook,
@@ -2241,8 +2250,41 @@ function pushLoserClassificationRiskCandidates(candidates, context) {
 }
 
 function pushDrawGroupOutlookCandidates(candidates, context) {
-  const { homeName, awayName, group, matchday, groupOutlook, homeOutlook, awayOutlook } = context;
+  const { homeName, awayName, homeScore, awayScore, totalGoals, group, matchday, groupOutlook, homeOutlook, awayOutlook } = context;
   if (!groupOutlook) return;
+
+  const homeFirst = homeOutlook?.rank === 1;
+  const awayFirst = awayOutlook?.rank === 1;
+  const leaderName = homeFirst ? homeName : awayFirst ? awayName : "";
+  const opponentName = homeFirst ? awayName : awayFirst ? homeName : "";
+  const leaderOutlook = homeFirst ? homeOutlook : awayFirst ? awayOutlook : null;
+  const leaderLockedFirst = Boolean(leaderOutlook?.guaranteedFirst || leaderOutlook?.remainingGames === 0);
+  const highScoringClause =
+    Number(totalGoals || 0) >= 6
+      ? ` tras un ${homeScore}-${awayScore} de ${formatGoalCount(totalGoals)} goles ante ${opponentName}`
+      : ` tras empatar con ${opponentName}`;
+
+  if (matchday >= 3 && leaderName && leaderLockedFirst) {
+    candidates.push({
+      priority: 116,
+      level: 1,
+      source: "editorial-group-qualification",
+      signature: "draw-leader-finishes-first",
+      text: `${leaderName} asegura el primer lugar del Grupo ${group}${highScoringClause}.`,
+    });
+    return;
+  }
+
+  if (matchday >= 2 && leaderName && leaderOutlook?.guaranteedFirst) {
+    candidates.push({
+      priority: 116,
+      level: 1,
+      source: "editorial-group-qualification",
+      signature: "draw-leader-guaranteed-first",
+      text: `${leaderName} asegura el primer lugar del Grupo ${group}${highScoringClause}.`,
+    });
+    return;
+  }
 
   if (matchday === 2 && groupOutlook.openForFinalDay) {
     candidates.push({
@@ -2269,6 +2311,17 @@ function pushDrawGroupOutlookCandidates(candidates, context) {
         : `${homeName} y ${awayName} empataron y mantienen opciones de avanzar en el Grupo ${group}.`,
     });
   }
+}
+
+function formatGoalCount(value) {
+  const words = {
+    6: "seis",
+    7: "siete",
+    8: "ocho",
+    9: "nueve",
+    10: "diez",
+  };
+  return words[Number(value)] || String(value);
 }
 
 function buildEditorialProfile(name, facts, prior) {

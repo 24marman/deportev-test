@@ -415,6 +415,40 @@ runCase({
 });
 
 runCase({
+  name: "draw that decides first place beats high-scoring generic angle",
+  matchData: baseMatch({
+    eventId: 9010,
+    home: "Colombia",
+    away: "Portugal",
+    homeScore: 4,
+    awayScore: 4,
+    group: "K",
+    matchday: 3,
+    priorGroup: {
+      homePrior: { played: 2, wins: 2, draws: 0, losses: 0, points: 6, goalsFor: 6, goalsAgainst: 2 },
+      awayPrior: { played: 2, wins: 1, draws: 1, losses: 0, points: 4, goalsFor: 5, goalsAgainst: 2 },
+      homeAfter: { played: 3, wins: 2, draws: 1, losses: 0, points: 7, goalsFor: 10, goalsAgainst: 6 },
+      awayAfter: { played: 3, wins: 1, draws: 2, losses: 0, points: 5, goalsFor: 9, goalsAgainst: 6 },
+      tableAfter: [
+        { team: "colombia", played: 3, wins: 2, draws: 1, losses: 0, points: 7, goalsFor: 10, goalsAgainst: 6, goalDifference: 4 },
+        { team: "portugal", played: 3, wins: 1, draws: 2, losses: 0, points: 5, goalsFor: 9, goalsAgainst: 6, goalDifference: 3 },
+      ],
+      groupOutlook: {
+        home: { played: 3, points: 7, rank: 1, remainingGames: 0, guaranteedFirst: true, guaranteedTopTwo: true },
+        away: { played: 3, points: 5, rank: 2, remainingGames: 0, guaranteedTopTwo: true },
+        teams: {
+          colombia: { played: 3, points: 7, rank: 1, remainingGames: 0, guaranteedFirst: true, guaranteedTopTwo: true },
+          portugal: { played: 3, points: 5, rank: 2, remainingGames: 0, guaranteedTopTwo: true },
+        },
+      },
+    },
+  }),
+  expectSignature: "draw-leader-finishes-first",
+  expectIncludes: ["Colombia", "primer lugar", "4-4"],
+  rejectIncludes: ["partidos más abiertos", "partido abierto"],
+});
+
+runCase({
   name: "player all-time scorer record beats match description",
   matchData: baseMatch({
     eventId: 9002,

@@ -354,6 +354,7 @@ function buildSystemPrompt() {
     "Objetivo: responder qué ocurrió y por qué importa.",
     "Longitud ideal: 15 a 35 palabras. Máximo dos oraciones si es indispensable.",
     "Tono: humano, natural, informativo, neutral, con criterio editorial. No suenes a narrador de TV ni a aficionado.",
+    "Antes de escribir, revisa la tabla despues del partido: quien queda primero, segundo o tercero; quien asegura liderato; quien clasifica; quien queda condicionado.",
     "Prioriza consecuencias competitivas: clasificación, eliminación, liderato, primer lugar, boleto, récord o cambio fuerte del grupo.",
     "Si hay una consecuencia competitiva importante, debe aparecer antes que estadísticas o lectura táctica.",
     "Puedes combinar una estadística relevante si explica el partido, por ejemplo dominio, ocasiones claras, xG, gol tardío o partido pobre.",
@@ -437,6 +438,9 @@ function summarizePlayerMilestones(matchData) {
 function summarizeTournamentContext(matchData) {
   const tournament = matchData?.context?.tournament || {};
   const priorGroup = matchData?.context?.priorGroup || {};
+  const groupOutlook = priorGroup.groupOutlook || {};
+  const tableBefore = summarizeGroupTable(priorGroup.tableBefore);
+  const tableAfter = summarizeGroupTable(priorGroup.tableAfter);
   return {
     newlyQualified: tournament.newlyQualified || [],
     newlyGuaranteedFirst: tournament.newlyGuaranteedFirst || [],
@@ -451,8 +455,28 @@ function summarizeTournamentContext(matchData) {
       home: priorGroup.homeAfter || null,
       away: priorGroup.awayAfter || null,
     },
+    groupTableBefore: tableBefore,
+    groupTableAfter: tableAfter,
+    groupLeaderAfter: tableAfter[0] || null,
+    currentTeamRanksAfter: {
+      home: groupOutlook.home || null,
+      away: groupOutlook.away || null,
+    },
     groupOutlook: priorGroup.groupOutlook || null,
   };
+}
+
+function summarizeGroupTable(rows = []) {
+  return (rows || []).slice(0, 6).map((row, index) => ({
+    rank: row.rank || index + 1,
+    team: normalizeTeamName(row.team),
+    teamKey: row.team,
+    played: row.played,
+    points: row.points,
+    goalDifference: row.goalDifference,
+    goalsFor: row.goalsFor,
+    goalsAgainst: row.goalsAgainst,
+  }));
 }
 
 function summarizeNewsForWriter(signals) {
