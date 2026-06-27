@@ -363,8 +363,8 @@ runCase({
   name: "matchday two winner stakes beat loser chance dominance",
   matchData: paraguayTurkeyMatchdayTwo,
   expectSignature: "matchday-two-winner-enters-top-two-race:back-in-race+winner-survives-opponent-clear-chances",
-  expectIncludes: ["Paraguay", "resistió el dominio de Turquía", "pelea por avanzar"],
-  rejectIncludes: ["consigue tres puntos clave", "venció a Turquía pese al dominio de Turquía"],
+  expectIncludes: ["Paraguay", "resistió el dominio de Turquía", "reactiva su pelea por avanzar"],
+  rejectIncludes: ["consigue tres puntos clave", "se mete de lleno en la pelea por avanzar", "venció a Turquía pese al dominio de Turquía"],
 });
 
 runNegativeCase({
@@ -380,7 +380,7 @@ runCase({
     recentEditorialSignatures: [
       {
         signature: "matchday-two-winner-enters-top-two-race:back-in-race+winner-survives-opponent-clear-chances",
-        headline: "Paraguay resistió el dominio de Turquía y se mete de lleno en la pelea por avanzar en el Grupo D.",
+        headline: "Paraguay resistió el dominio de Turquía y reactiva su pelea por avanzar en el Grupo D.",
       },
     ],
   },

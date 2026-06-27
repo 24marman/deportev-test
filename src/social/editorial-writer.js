@@ -1,12 +1,18 @@
 const { getFlagEmoji, normalizeTeamName } = require("./caption");
 
-const DEFAULT_MODEL = "gpt-4o-mini";
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 const DEFAULT_TIMEOUT_MS = 3200;
 const DEFAULT_MAX_ATTEMPTS = 2;
 
 const BANNED_TEMPLATE_FRAGMENTS = [
   "consigue tres puntos clave",
+  "consigue tres puntos claves",
   "tres puntos clave para meterse",
+  "tres puntos claves",
+  "tres puntos vitales",
+  "tres puntos importantes",
+  "suma tres puntos",
   "suma tres puntos para la tabla",
   "se mete de lleno en la pelea por avanzar",
   "con una victoria clara",
@@ -21,7 +27,7 @@ const BANNED_TEMPLATE_FRAGMENTS = [
 
 function isEditorialAiEnabled() {
   if (process.env.EDITORIAL_AI_ENABLED === "false") return false;
-  return Boolean(process.env.OPENAI_API_KEY);
+  return Boolean(getEditorialProvider());
 }
 
 async function writeEditorialHeadline({
@@ -40,7 +46,7 @@ async function writeEditorialHeadline({
     const fallback = pickMemorySafeFallback(context, validationRules);
     return withWriterMeta(fallback.context, {
       used: false,
-      reason: process.env.EDITORIAL_AI_ENABLED === "false" ? "Editorial AI disabled." : "OPENAI_API_KEY is missing.",
+      reason: process.env.EDITORIAL_AI_ENABLED === "false" ? "Editorial AI disabled." : "Editorial AI provider key is missing.",
       fallbackAdjusted: fallback.adjusted,
       fallbackReason: fallback.reason,
     });
@@ -58,11 +64,13 @@ async function writeEditorialHeadline({
 
   const payload = buildWriterPayload(matchData, context, recentEditorialSignatures);
   const attempts = Math.max(1, Math.min(3, Number(maxAttempts || DEFAULT_MAX_ATTEMPTS)));
+  const provider = getEditorialProvider();
   let lastError = "";
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const generated = await requestOpenAIHeadline({
+      const generated = await requestAiHeadline({
+        provider,
         payload,
         feedback: lastError,
         fetchImpl,
@@ -75,12 +83,13 @@ async function writeEditorialHeadline({
           {
             ...context,
             headline: validation.headline,
-            source: `openai-editorial-writer:${getEditorialModel()}+${context.source}`,
+            source: `${provider}-editorial-writer:${getEditorialModel(provider)}+${context.source}`,
             decision: {
               ...(context.decision || {}),
               aiWriter: {
                 used: true,
-                model: getEditorialModel(),
+                provider,
+                model: getEditorialModel(provider),
                 attempt,
                 baseHeadline: context.headline,
               },
@@ -88,7 +97,8 @@ async function writeEditorialHeadline({
           },
           {
             used: true,
-            model: getEditorialModel(),
+            provider,
+            model: getEditorialModel(provider),
             attempt,
             baseHeadline: context.headline,
           },
@@ -183,6 +193,18 @@ function pickMemorySafeFallback(context, validationRules) {
   };
 }
 
+async function requestAiHeadline({ provider, payload, feedback, fetchImpl, timeoutMs }) {
+  if (provider === "gemini") {
+    return requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs });
+  }
+
+  if (provider === "openai") {
+    return requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs });
+  }
+
+  throw new Error("No editorial AI provider is configured.");
+}
+
 async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || DEFAULT_TIMEOUT_MS)));
@@ -196,7 +218,7 @@ async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: getEditorialModel(),
+        model: getEditorialModel("openai"),
         temperature: Number(process.env.EDITORIAL_AI_TEMPERATURE || 0.72),
         max_tokens: 90,
         messages: [
@@ -231,8 +253,98 @@ async function requestOpenAIHeadline({ payload, feedback, fetchImpl, timeoutMs }
   }
 }
 
-function getEditorialModel() {
-  return process.env.EDITORIAL_AI_MODEL || process.env.OPENAI_TEXT_MODEL || DEFAULT_MODEL;
+async function requestGeminiHeadline({ payload, feedback, fetchImpl, timeoutMs }) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing.");
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || DEFAULT_TIMEOUT_MS)));
+  const model = getEditorialModel("gemini");
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: buildSystemPrompt() }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: JSON.stringify(
+                  {
+                    ...payload,
+                    retry_feedback: feedback || null,
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: Number(process.env.EDITORIAL_AI_TEMPERATURE || 0.72),
+          maxOutputTokens: 90,
+          responseMimeType: "text/plain",
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await safeResponseText(response);
+      throw new Error(`Gemini editorial writer failed (${response.status}): ${body.slice(0, 180)}`);
+    }
+
+    const data = await response.json();
+    return (data?.candidates?.[0]?.content?.parts || [])
+      .map((part) => part?.text || "")
+      .join("")
+      .trim();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getEditorialProvider() {
+  const requested = String(process.env.EDITORIAL_AI_PROVIDER || "auto").trim().toLowerCase();
+
+  if (requested === "gemini" || requested === "google") {
+    return getGeminiApiKey() ? "gemini" : "";
+  }
+
+  if (requested === "openai") {
+    return process.env.OPENAI_API_KEY ? "openai" : "";
+  }
+
+  if (requested && requested !== "auto") {
+    return "";
+  }
+
+  if (getGeminiApiKey()) return "gemini";
+  if (process.env.OPENAI_API_KEY) return "openai";
+  return "";
+}
+
+function getGeminiApiKey() {
+  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
+}
+
+function getEditorialModel(provider = getEditorialProvider()) {
+  if (provider === "gemini") {
+    return process.env.EDITORIAL_AI_MODEL || process.env.GEMINI_TEXT_MODEL || DEFAULT_GEMINI_MODEL;
+  }
+
+  return process.env.EDITORIAL_AI_MODEL || process.env.OPENAI_TEXT_MODEL || DEFAULT_OPENAI_MODEL;
 }
 
 function buildSystemPrompt() {
@@ -247,7 +359,7 @@ function buildSystemPrompt() {
     "Puedes combinar una estadística relevante si explica el partido, por ejemplo dominio, ocasiones claras, xG, gol tardío o partido pobre.",
     "No inventes datos. Usa exclusivamente los hechos enviados.",
     "No repitas ni parafrasees titulares recientes. Evita frases de plantilla.",
-    "No uses estas frases: consigue tres puntos clave, suma tres puntos para la tabla, con una victoria clara, suma un punto histórico ante una de las candidatas al título.",
+    "No uses estas frases: consigue tres puntos clave, suma tres puntos, tres puntos vitales, suma tres puntos para la tabla, con una victoria clara, suma un punto histórico ante una de las candidatas al título.",
   ].join("\n");
 }
 

@@ -65,6 +65,32 @@ function fakeOpenAIResponse(headlines) {
   });
 }
 
+function fakeGeminiResponse(headlines) {
+  const queue = [...headlines];
+  return async (url) => {
+    assert(String(url).includes("generativelanguage.googleapis.com"), "Gemini provider should call Google Generative Language API");
+
+    return {
+      ok: true,
+      async json() {
+        return {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: queue.shift() || "",
+                  },
+                ],
+              },
+            },
+          ],
+        };
+      },
+    };
+  };
+}
+
 async function withEnv(vars, callback) {
   const previous = {};
   for (const [key, value] of Object.entries(vars)) {
@@ -109,6 +135,8 @@ async function main() {
   await withEnv(
     {
       OPENAI_API_KEY: "test-key",
+      GEMINI_API_KEY: "",
+      EDITORIAL_AI_PROVIDER: "openai",
       EDITORIAL_AI_ENABLED: "true",
       EDITORIAL_AI_MODEL: "test-model",
     },
@@ -165,12 +193,52 @@ async function main() {
       );
 
       assert.strictEqual(repeatedCaboVerdeTemplate.ok, false, "reused Cabo Verde historic-point template should be rejected");
+
+      const repeatedPointsTemplate = validateEditorialHeadline(
+        "Paraguay consiguió su primera victoria del Mundial y suma tres puntos vitales en la pelea del Grupo D.",
+        {
+          teamNames: ["Paraguay", "Turquía"],
+          requiredNarratives: [],
+          recentHeadlines: [],
+          baseHeadline: "",
+        },
+      );
+
+      assert.strictEqual(repeatedPointsTemplate.ok, false, "generic three-points template should be rejected");
     },
   );
 
   await withEnv(
     {
       OPENAI_API_KEY: "",
+      GEMINI_API_KEY: "test-gemini-key",
+      EDITORIAL_AI_PROVIDER: "gemini",
+      EDITORIAL_AI_ENABLED: "true",
+      EDITORIAL_AI_MODEL: "",
+      GEMINI_TEXT_MODEL: "test-gemini-model",
+    },
+    async () => {
+      const accepted = await writeEditorialHeadline({
+        matchData,
+        context,
+        recentEditorialSignatures: [],
+        fetchImpl: fakeGeminiResponse([
+          "Paraguay aguantó las mejores ocasiones de Turquía y mantiene viva su ruta para avanzar en el Grupo D.",
+        ]),
+      });
+
+      assert.strictEqual(accepted.aiWriter.used, true, "valid Gemini headline should be used");
+      assert.strictEqual(accepted.aiWriter.provider, "gemini", "Gemini provider should be marked in metadata");
+      assert.strictEqual(accepted.aiWriter.model, "test-gemini-model", "Gemini model should be marked in metadata");
+      assert(accepted.headline.includes("Paraguay"), "accepted Gemini headline should mention the team");
+      assert(accepted.headline.includes("Grupo D"), "accepted Gemini headline should keep the group consequence");
+    },
+  );
+
+  await withEnv(
+    {
+      OPENAI_API_KEY: "",
+      GEMINI_API_KEY: "",
       EDITORIAL_AI_ENABLED: "true",
     },
     async () => {

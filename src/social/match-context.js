@@ -506,7 +506,7 @@ function getExceptionalSecondaryClause(candidate) {
     return signature.includes("winner-creates") ? "con las ocasiones más claras" : "tras resistir el dominio rival";
   }
   if (source === "bsd-scoreline") {
-    const clauses = ["con una victoria clara", "con autoridad", "sin dejar dudas", "con margen en el marcador"];
+    const clauses = ["por margen amplio", "con autoridad", "sin dejar dudas", "con margen en el marcador"];
     return clauses[Math.abs(hashText(`${text}:${signature}`)) % clauses.length];
   }
 
@@ -1763,7 +1763,7 @@ function pushGroupStakesCandidates(candidates, context) {
               priority: basePriority,
               source: "editorial-group-stakes",
               signature: `${baseSignature}:back-in-race`,
-              text: `${winnerName} venció a ${loserName} y se mete de lleno en la pelea por avanzar en el Grupo ${group}.`,
+              text: `${winnerName} venció a ${loserName} y reactiva su pelea por avanzar en el Grupo ${group}.`,
             },
             {
               priority: basePriority - 0.5,
