@@ -206,6 +206,18 @@ async function main() {
       );
 
       assert.strictEqual(repeatedPointsTemplate.ok, false, "generic three-points template should be rejected");
+
+      const awkwardWeightPhrase = validateEditorialHeadline(
+        "Portugal conserva el liderato, pero Colombia rescata un 4-4 que deja peso real en la pelea por avanzar.",
+        {
+          teamNames: ["Portugal", "Colombia"],
+          requiredNarratives: [],
+          recentHeadlines: [],
+          baseHeadline: "",
+        },
+      );
+
+      assert.strictEqual(awkwardWeightPhrase.ok, false, "awkward weight phrasing should be rejected");
     },
   );
 

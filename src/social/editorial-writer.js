@@ -23,6 +23,9 @@ const BANNED_TEMPLATE_FRAGMENTS = [
   "en un partido de alto ritmo",
   "partido de alto ritmo",
   "partido abierto y de mucho ritmo",
+  "deja peso real",
+  "pesa en el cierre del grupo",
+  "candidata de peso",
 ];
 
 function isEditorialAiEnabled() {
@@ -480,7 +483,9 @@ function buildSystemPrompt() {
     "Escribe SOLO una frase en español, sin comillas, sin hashtags, sin emojis y sin marcador separado.",
     "Objetivo: responder qué ocurrió y por qué importa.",
     "Longitud ideal: 15 a 35 palabras. Máximo dos oraciones si es indispensable.",
-    "Tono: humano, natural, informativo, neutral, con criterio editorial. No suenes a narrador de TV ni a aficionado.",
+    "Tono: humano, natural, informativo, neutral, con criterio editorial. Debe sonar como un reportero deportivo mexicano moderno, no como traduccion literal, narrador de TV, columna de opinion ni aficionado.",
+    "Usa frases comunes del periodismo deportivo en Mexico cuando encajen: rescata el empate, evita la derrota, amarra el liderato, queda cerca de avanzar, mantiene opciones, queda obligado, deja escapar la victoria.",
+    "Prefiere verbos directos y titulares limpios. Evita giros raros o inflados como 'deja peso real', 'pesa en el cierre del grupo', 'candidata de peso' o frases que suenen escritas para rellenar variedad.",
     "Antes de escribir, revisa la tabla despues del partido: quien queda primero, segundo o tercero; quien asegura liderato; quien clasifica; quien queda condicionado.",
     "Prioriza consecuencias competitivas: clasificación, eliminación, liderato, primer lugar, boleto, récord o cambio fuerte del grupo.",
     "Si hay una consecuencia competitiva importante, debe aparecer antes que estadísticas o lectura táctica.",
@@ -497,9 +502,11 @@ function buildReasonerPrompt() {
     "Debes razonar como periodista deportivo: identifica la noticia mas importante que deja el partido para la audiencia.",
     "Evalua todos los angulos disponibles: tabla, clasificacion, eliminacion, liderato, record, hito historico, sorpresa, gol tardio, remontada, partido de muchos goles, dominio estadistico, mal partido, contexto del dia y contexto de selecciones.",
     "A veces la tabla manda; a veces manda un record; a veces manda un partido historico; a veces dos angulos tienen peso parecido y deben convivir en una sola frase.",
+    "El estilo debe sentirse como un reportero deportivo mexicano moderno: claro, corto, natural y con buen pulso editorial. No escribas como narrador de TV ni como traduccion de ingles.",
+    "Usa lenguaje futbolero natural solo cuando sea preciso: rescata el empate, evita la derrota, amarra el liderato, queda cerca de avanzar, mantiene opciones, queda obligado, deja escapar la victoria.",
     "Si hay clasificacion, eliminacion, liderato asegurado o record historico, solo puedes omitirlo si otro hecho de igual o mayor peso aparece claramente en los datos; si caben ambos, combinalos.",
     "No inventes. Usa exclusivamente los datos del payload.",
-    "No redactes con plantillas ni frases repetidas. No uses 'suma tres puntos' ni 'en un partido de alto ritmo'.",
+    "No redactes con plantillas ni frases repetidas. No uses 'suma tres puntos', 'en un partido de alto ritmo', 'deja peso real', 'pesa en el cierre del grupo' ni 'candidata de peso'.",
     "Devuelve SOLO JSON valido, sin markdown.",
   ].join("\n");
 }
