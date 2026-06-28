@@ -164,7 +164,7 @@
     <main>
       <header>
         <h1>Voice Data Bot</h1>
-        <p>Pregunta con voz o texto. Gemini razona con la data del torneo y la respuesta se lee con la voz del navegador.</p>
+        <p>Pregunta con voz o texto. Gemini razona con la data del torneo y también genera la voz de respuesta.</p>
       </header>
 
       <section class="panel">
@@ -183,7 +183,7 @@
         <div class="answer">
           <strong id="intent">Listo</strong>
           <div id="answer">Haz una pregunta para escuchar la respuesta.</div>
-          <small id="meta">Modo: Gemini + data cuando la llave este activa.</small>
+          <small id="meta">Modo: Gemini + data + voz Gemini cuando la llave este activa.</small>
         </div>
       </section>
     </main>
@@ -195,6 +195,10 @@
       const metaEl = document.querySelector("#meta");
       const askButton = document.querySelector("#ask");
       const micButton = document.querySelector("#mic");
+      let audioContext = null;
+      let currentAudio = null;
+      let currentAudioUrl = "";
+      let currentSource = null;
 
       async function ask(question) {
         const q = String(question || questionInput.value || "").trim();
@@ -204,14 +208,16 @@
         answerEl.textContent = "Gemini esta razonando con la data...";
         intentEl.textContent = "Procesando";
         metaEl.textContent = "Modo: consultando Gemini.";
+        unlockAudio();
 
         try {
           const response = await fetch(`/api/voice/query?q=${encodeURIComponent(q)}`);
           const payload = await response.json();
+          const baseMeta = buildMeta(payload);
           answerEl.textContent = payload.answer || "No encontre respuesta.";
           intentEl.textContent = payload.intent || "Respuesta";
-          metaEl.textContent = buildMeta(payload);
-          speak(payload.answer || "");
+          metaEl.textContent = `${baseMeta} Audio: generando voz Gemini.`;
+          await speak(payload.answer || "", baseMeta);
         } catch (error) {
           answerEl.textContent = `No pude consultar el bot: ${error.message}`;
           intentEl.textContent = "Error";
@@ -233,7 +239,103 @@
         return `Modo: respaldo local. Gemini no respondio: ${reason}.`;
       }
 
-      function speak(text) {
+      async function speak(text, baseMeta) {
+        if (!text) return;
+
+        stopAudio();
+
+        try {
+          const response = await fetch("/api/voice/speak", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text }),
+          });
+
+          if (!response.ok) {
+            let detail = response.statusText;
+            try {
+              const payload = await response.json();
+              detail = payload.error || detail;
+            } catch (error) {
+              detail = await response.text();
+            }
+            throw new Error(detail || `HTTP ${response.status}`);
+          }
+
+          const blob = await response.blob();
+          await playGeneratedAudio(blob);
+          metaEl.textContent = `${baseMeta} Audio: Gemini TTS.`;
+        } catch (error) {
+          metaEl.textContent = `${baseMeta} Audio: voz del navegador como respaldo (${error.message}).`;
+          fallbackSpeak(text);
+        }
+      }
+
+      function unlockAudio() {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (!Context) return;
+
+        try {
+          if (!audioContext) audioContext = new Context();
+          if (audioContext.state === "suspended") audioContext.resume();
+          const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+          const source = audioContext.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioContext.destination);
+          source.start(0);
+        } catch (error) {
+          // The regular audio element fallback will handle unsupported browsers.
+        }
+      }
+
+      async function playGeneratedAudio(blob) {
+        if (audioContext) {
+          if (audioContext.state === "suspended") await audioContext.resume();
+          const audioBuffer = await audioContext.decodeAudioData(await blob.arrayBuffer());
+          currentSource = audioContext.createBufferSource();
+          currentSource.buffer = audioBuffer;
+          currentSource.connect(audioContext.destination);
+          currentSource.onended = () => {
+            currentSource = null;
+          };
+          currentSource.start(0);
+          return;
+        }
+
+        currentAudioUrl = URL.createObjectURL(blob);
+        currentAudio = new Audio(currentAudioUrl);
+        currentAudio.onended = stopAudio;
+        currentAudio.onerror = () => {
+          throw new Error("Gemini TTS no pudo reproducirse.");
+        };
+        await currentAudio.play();
+      }
+
+      function stopAudio() {
+        if (currentSource) {
+          try {
+            currentSource.stop();
+          } catch (error) {
+            // Already stopped.
+          }
+          currentSource = null;
+        }
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+        if (currentAudioUrl) {
+          URL.revokeObjectURL(currentAudioUrl);
+          currentAudioUrl = "";
+        }
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+      }
+
+      function fallbackSpeak(text) {
         if (!text || !("speechSynthesis" in window)) return;
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
