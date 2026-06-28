@@ -92,7 +92,15 @@ function getFlagAssetUrl(name) {
   return `./assets/flags/${iso2}.svg`;
 }
 
+function getAllTeamMetadata() {
+  return TEAM_METADATA.map((team) => ({
+    ...team,
+    keys: [...team.keys],
+  }));
+}
+
 module.exports = {
+  getAllTeamMetadata,
   getDisplayTeamName,
   getFlagAssetUrl,
   getFlagEmoji,

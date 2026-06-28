@@ -1,6 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const { getDisplayTeamName } = require("../lib/team-metadata");
+const {
+  answerHistoricalVoiceContext,
+  buildHistoricalVoiceContext,
+} = require("./historical-football-data");
 
 const ANALYSIS_PATH = path.join(__dirname, "..", "..", "outputs", "analysis", "group-stage-best-xi.json");
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -9,6 +13,10 @@ const DEFAULT_TIMEOUT_MS = 7000;
 async function answerSportsVoiceQuery(question, options = {}) {
   const text = normalize(question);
   const analysis = loadAnalysis(options.analysisPath || ANALYSIS_PATH);
+  const historicalContext = await buildHistoricalVoiceContext(question, {
+    fetchImpl: options.fetchImpl || globalThis.fetch,
+    timeoutMs: options.timeoutMs,
+  });
 
   if (!text) {
     return response({
@@ -19,7 +27,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  if (!analysis) {
+  if (!analysis && !historicalContext) {
     return response({
       intent: "missing_data",
       answer: "Todavia no tengo cargada la cache de analisis. Primero necesito calcular la data del torneo.",
@@ -28,7 +36,15 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  const fallback = answerSportsVoiceQueryFromData(text, analysis);
+  const fallback = answerSportsVoiceQueryFromData(text, analysis, historicalContext);
+
+  if (historicalContext && !historicalContext.available) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      reason: historicalContext.reason || "historical_context unavailable",
+    });
+  }
 
   if (!isVoiceAiEnabled()) {
     return withAiStatus(fallback, {
@@ -52,6 +68,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
       normalizedQuestion: text,
       analysis,
       fallback,
+      historicalContext,
       fetchImpl: options.fetchImpl || globalThis.fetch,
       timeoutMs: options.timeoutMs,
     });
@@ -64,7 +81,20 @@ async function answerSportsVoiceQuery(question, options = {}) {
   }
 }
 
-function answerSportsVoiceQueryFromData(text, analysis) {
+function answerSportsVoiceQueryFromData(text, analysis, historicalContext = null) {
+  if (historicalContext) {
+    return response(answerHistoricalVoiceContext(historicalContext));
+  }
+
+  if (!analysis) {
+    return response({
+      intent: "missing_data",
+      answer: "Todavia no tengo cargada la cache de analisis para responder esa consulta.",
+      confidence: 1,
+      source: "voice-query-router",
+    });
+  }
+
   if (isTopGoalkeepersQuestion(text)) {
     return answerTopGoalkeepers(analysis);
   }
@@ -100,6 +130,7 @@ async function answerWithGemini({
   normalizedQuestion,
   analysis,
   fallback,
+  historicalContext,
   fetchImpl,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
@@ -132,7 +163,7 @@ async function answerWithGemini({
                   {
                     question,
                     normalized_question: normalizedQuestion,
-                    data_context: buildVoiceDataContext(analysis, fallback),
+                    data_context: buildVoiceDataContext(analysis, fallback, historicalContext),
                     required_output_json: {
                       intent: "string",
                       answer: "string, respuesta natural en espanol de Mexico, lista para voz",
@@ -331,6 +362,9 @@ function buildVoiceGeminiPrompt() {
     "Eres el cerebro de voz de DeporteV: un analista deportivo mexicano que responde preguntas con criterio, claridad y cero relleno.",
     "Tu tarea es razonar usando exclusivamente el JSON data_context que recibes. No inventes nombres, numeros, marcas, rankings ni contexto que no este en la evidencia.",
     "Si la pregunta pide un dato puntual, responde directo y agrega solo el contexto mas util.",
+    "Si data_context trae historical_context, dale prioridad para preguntas de historial, enfrentamientos, duelos o cara a cara.",
+    "Si historical_context.coverage.complete es false, aclara que el API solo devolvio esos partidos y no afirmes que es el historial completo.",
+    "Si historical_context no esta disponible por falta de cobertura del API, explica esa limitacion sin inventar resultados.",
     "Si hay ranking, menciona el lider y, si cabe, uno o dos perseguidores. No leas tablas largas en voz.",
     "Tono: natural, profesional, moderno, como una app deportiva o reportero mexicano informativo. Nada de narrador de TV ni frases infladas.",
     "Respuesta para voz: una o dos frases cortas, sin markdown, sin hashtags, sin emojis, sin bullets.",
@@ -340,25 +374,27 @@ function buildVoiceGeminiPrompt() {
   ].join("\n");
 }
 
-function buildVoiceDataContext(analysis, fallback) {
-  const bestXI = (analysis.bestXI || []).map(toPublicPlayer);
-  const topGoalkeepersBySaves = (analysis.topGoalkeepersBySaves || []).slice(0, 10).map(toPublicPlayer);
+function buildVoiceDataContext(analysis, fallback, historicalContext = null) {
+  const safeAnalysis = analysis || {};
+  const bestXI = (safeAnalysis.bestXI || []).map(toPublicPlayer);
+  const topGoalkeepersBySaves = (safeAnalysis.topGoalkeepersBySaves || []).slice(0, 10).map(toPublicPlayer);
   const topByPosition = {};
 
-  for (const [position, players] of Object.entries(analysis.topByPosition || {})) {
+  for (const [position, players] of Object.entries(safeAnalysis.topByPosition || {})) {
     topByPosition[position] = (players || []).slice(0, 8).map(toPublicPlayer);
   }
 
   return {
-    source: analysis.source || "bsd-api-analysis-cache",
-    scope: analysis.scope || "Mundial 2026, fase de grupos",
-    generated_at: analysis.generatedAt || null,
-    events_count: analysis.eventsCount || (analysis.events || []).length || null,
-    methodology: analysis.methodology || null,
+    source: safeAnalysis.source || "bsd-api-analysis-cache",
+    scope: safeAnalysis.scope || "Mundial 2026, fase de grupos",
+    generated_at: safeAnalysis.generatedAt || null,
+    events_count: safeAnalysis.eventsCount || (safeAnalysis.events || []).length || null,
+    methodology: safeAnalysis.methodology || null,
     detected_intent: fallback.intent || "unknown",
     candidate_data_answer: fallback.answer || "",
+    historical_context: historicalContext,
     facts: {
-      goalkeeper_most_saves: toPublicPlayer(analysis.goalkeeperMostSaves),
+      goalkeeper_most_saves: toPublicPlayer(safeAnalysis.goalkeeperMostSaves),
       top_goalkeepers_by_saves: topGoalkeepersBySaves,
       best_xi_by_weighted_rating: bestXI,
       top_rating_from_best_xi: bestXI
