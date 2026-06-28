@@ -104,6 +104,12 @@
         border-color: var(--line);
       }
 
+      button.listening {
+        background: #16804d;
+        border-color: color-mix(in srgb, var(--green), white 42%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--green), transparent 72%);
+      }
+
       button:disabled {
         cursor: not-allowed;
         opacity: 0.55;
@@ -171,7 +177,7 @@
         <div class="controls">
           <input id="question" value="¿Quién es el portero con más atajadas hasta ahora?" />
           <button id="ask">Preguntar</button>
-          <button id="mic" class="secondary">Micrófono</button>
+          <button id="mic" class="secondary">Mantén micrófono</button>
         </div>
 
         <div class="chips">
@@ -199,6 +205,12 @@
       let currentAudio = null;
       let currentAudioUrl = "";
       let currentSource = null;
+      let recognition = null;
+      let micHeld = false;
+      let micStopping = false;
+      let micSubmitted = false;
+      let finalTranscript = "";
+      let interimTranscript = "";
 
       async function ask(question) {
         const q = String(question || questionInput.value || "").trim();
@@ -345,7 +357,10 @@
         window.speechSynthesis.speak(utterance);
       }
 
-      function startMic() {
+      function startMicHold(event) {
+        event?.preventDefault();
+        if (micHeld) return;
+
         const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Recognition) {
           answerEl.textContent = "Este navegador no tiene reconocimiento de voz integrado. Puedes escribir la pregunta.";
@@ -353,30 +368,153 @@
           return;
         }
 
-        const recognition = new Recognition();
-        recognition.lang = "es-MX";
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-        micButton.disabled = true;
+        stopAudio();
+        unlockAudio();
+        micHeld = true;
+        micStopping = false;
+        micSubmitted = false;
+        finalTranscript = "";
+        interimTranscript = "";
+        questionInput.value = "";
+        intentEl.textContent = "Escuchando";
+        answerEl.textContent = "Mantén presionado y habla. Al soltar, mando la pregunta.";
+        metaEl.textContent = "Micrófono activo: suelta el botón para enviar.";
+        micButton.classList.add("listening");
         micButton.textContent = "Escuchando...";
+
+        try {
+          micButton.setPointerCapture?.(event.pointerId);
+        } catch (error) {
+          // Some browsers do not support pointer capture on this element.
+        }
+
+        recognition = new Recognition();
+        recognition.lang = "es-MX";
+        recognition.interimResults = true;
+        recognition.continuous = true;
+        recognition.maxAlternatives = 1;
         recognition.onresult = (event) => {
-          const transcript = event.results?.[0]?.[0]?.transcript || "";
-          questionInput.value = transcript;
-          ask(transcript);
+          interimTranscript = "";
+          for (let index = event.resultIndex; index < event.results.length; index += 1) {
+            const result = event.results[index];
+            const transcript = result?.[0]?.transcript || "";
+            if (result?.isFinal) {
+              finalTranscript = `${finalTranscript} ${transcript}`.trim();
+            } else {
+              interimTranscript = `${interimTranscript} ${transcript}`.trim();
+            }
+          }
+
+          const currentText = getMicTranscript();
+          if (currentText) questionInput.value = currentText;
         };
-        recognition.onerror = () => {
-          answerEl.textContent = "No pude escuchar bien. Intenta otra vez o escribe la pregunta.";
+        recognition.onerror = (errorEvent) => {
+          const errorName = errorEvent?.error || "error";
+          if (errorName === "aborted" && micStopping) return;
+          answerEl.textContent =
+            errorName === "not-allowed"
+              ? "El navegador no tiene permiso para usar el micrófono."
+              : "No pude escuchar bien. Mantén presionado el botón y vuelve a intentar.";
           intentEl.textContent = "Micrófono";
+          metaEl.textContent = `Micrófono: ${errorName}.`;
         };
         recognition.onend = () => {
-          micButton.disabled = false;
-          micButton.textContent = "Micrófono";
+          if (micHeld && !micStopping) {
+            restartRecognition();
+            return;
+          }
+
+          finishMicHold();
         };
-        recognition.start();
+        startRecognition();
+      }
+
+      function stopMicHold(event) {
+        event?.preventDefault();
+        if (!micHeld) return;
+
+        micHeld = false;
+        micStopping = true;
+        try {
+          micButton.releasePointerCapture?.(event.pointerId);
+        } catch (error) {
+          // Pointer capture may already be released.
+        }
+
+        if (recognition) {
+          try {
+            recognition.stop();
+            return;
+          } catch (error) {
+            finishMicHold();
+            return;
+          }
+        }
+
+        finishMicHold();
+      }
+
+      function startRecognition() {
+        try {
+          recognition.start();
+        } catch (error) {
+          finishMicHold();
+          answerEl.textContent = "No pude activar el micrófono. Intenta otra vez.";
+          intentEl.textContent = "Micrófono";
+          metaEl.textContent = `Micrófono: ${error.message}.`;
+        }
+      }
+
+      function restartRecognition() {
+        window.setTimeout(() => {
+          if (!micHeld || !recognition) return;
+          try {
+            recognition.start();
+          } catch (error) {
+            // Chrome can throw if recognition is still settling; the user can release and retry.
+          }
+        }, 120);
+      }
+
+      function finishMicHold() {
+        const transcript = getMicTranscript();
+        recognition = null;
+        micHeld = false;
+        micStopping = false;
+        micButton.classList.remove("listening");
+        micButton.textContent = "Mantén micrófono";
+
+        if (micSubmitted) return;
+        micSubmitted = true;
+
+        if (!transcript) {
+          answerEl.textContent = "No detecté voz. Mantén presionado el botón mientras hablas.";
+          intentEl.textContent = "Micrófono";
+          metaEl.textContent = "Micrófono listo.";
+          return;
+        }
+
+        questionInput.value = transcript;
+        ask(transcript);
+      }
+
+      function getMicTranscript() {
+        return `${finalTranscript} ${interimTranscript}`.replace(/\s+/g, " ").trim();
       }
 
       askButton.addEventListener("click", () => ask());
-      micButton.addEventListener("click", startMic);
+      micButton.addEventListener("pointerdown", startMicHold);
+      micButton.addEventListener("pointerup", stopMicHold);
+      micButton.addEventListener("pointercancel", stopMicHold);
+      micButton.addEventListener("lostpointercapture", () => {
+        if (micHeld) stopMicHold();
+      });
+      micButton.addEventListener("keydown", (event) => {
+        if (event.code === "Space" || event.code === "Enter") startMicHold(event);
+      });
+      micButton.addEventListener("keyup", (event) => {
+        if (event.code === "Space" || event.code === "Enter") stopMicHold(event);
+      });
       questionInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") ask();
       });
