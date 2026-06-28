@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeporteV Voice Data Bot</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090b0c;
+        --panel: #111718;
+        --line: #263232;
+        --green: #11a85b;
+        --text: #f4f7f6;
+        --muted: #91a09c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at 50% 0%, #17201e 0, var(--bg) 42rem);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      main {
+        width: min(860px, 100%);
+        display: grid;
+        gap: 18px;
+      }
+
+      header {
+        display: grid;
+        gap: 6px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(28px, 5vw, 54px);
+        line-height: 0.95;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      .panel {
+        background: color-mix(in srgb, var(--panel), transparent 4%);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 10px;
+      }
+
+      input {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #080c0c;
+        color: var(--text);
+        font: inherit;
+        padding: 14px 14px;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: var(--green);
+      }
+
+      button {
+        border: 1px solid color-mix(in srgb, var(--green), white 20%);
+        border-radius: 6px;
+        background: var(--green);
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        padding: 0 16px;
+        min-height: 50px;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #0c1111;
+        color: var(--text);
+        border-color: var(--line);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .answer {
+        min-height: 120px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #070909;
+        padding: 18px;
+        display: grid;
+        align-content: start;
+        gap: 8px;
+      }
+
+      .answer strong {
+        color: var(--green);
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+
+      .answer div {
+        font-size: clamp(20px, 3vw, 32px);
+        line-height: 1.15;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chips button {
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+
+      @media (max-width: 680px) {
+        .controls {
+          grid-template-columns: 1fr;
+        }
+
+        button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Voice Data Bot</h1>
+        <p>Pregunta con voz o texto. La respuesta se consulta desde la data y se lee con la voz del navegador.</p>
+      </header>
+
+      <section class="panel">
+        <div class="controls">
+          <input id="question" value="¿Quién es el portero con más atajadas hasta ahora?" />
+          <button id="ask">Preguntar</button>
+          <button id="mic" class="secondary">Micrófono</button>
+        </div>
+
+        <div class="chips">
+          <button class="secondary" data-question="¿Quién es el portero con más atajadas?">Portero con más atajadas</button>
+          <button class="secondary" data-question="Dame el once ideal de la fase de grupos">XI ideal</button>
+          <button class="secondary" data-question="¿Quién tiene el mejor rating hasta ahora?">Mejor rating</button>
+        </div>
+
+        <div class="answer">
+          <strong id="intent">Listo</strong>
+          <div id="answer">Haz una pregunta para escuchar la respuesta.</div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const questionInput = document.querySelector("#question");
+      const answerEl = document.querySelector("#answer");
+      const intentEl = document.querySelector("#intent");
+      const askButton = document.querySelector("#ask");
+      const micButton = document.querySelector("#mic");
+
+      async function ask(question) {
+        const q = String(question || questionInput.value || "").trim();
+        if (!q) return;
+
+        askButton.disabled = true;
+        answerEl.textContent = "Consultando data...";
+        intentEl.textContent = "Procesando";
+
+        try {
+          const response = await fetch(`/api/voice/query?q=${encodeURIComponent(q)}`);
+          const payload = await response.json();
+          answerEl.textContent = payload.answer || "No encontre respuesta.";
+          intentEl.textContent = payload.intent || "Respuesta";
+          speak(payload.answer || "");
+        } catch (error) {
+          answerEl.textContent = `No pude consultar el bot: ${error.message}`;
+          intentEl.textContent = "Error";
+        } finally {
+          askButton.disabled = false;
+        }
+      }
+
+      function speak(text) {
+        if (!text || !("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "es-MX";
+        utterance.rate = 1.04;
+        utterance.pitch = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function startMic() {
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Recognition) {
+          answerEl.textContent = "Este navegador no tiene reconocimiento de voz integrado. Puedes escribir la pregunta.";
+          intentEl.textContent = "Micrófono no disponible";
+          return;
+        }
+
+        const recognition = new Recognition();
+        recognition.lang = "es-MX";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        micButton.disabled = true;
+        micButton.textContent = "Escuchando...";
+        recognition.onresult = (event) => {
+          const transcript = event.results?.[0]?.[0]?.transcript || "";
+          questionInput.value = transcript;
+          ask(transcript);
+        };
+        recognition.onerror = () => {
+          answerEl.textContent = "No pude escuchar bien. Intenta otra vez o escribe la pregunta.";
+          intentEl.textContent = "Micrófono";
+        };
+        recognition.onend = () => {
+          micButton.disabled = false;
+          micButton.textContent = "Micrófono";
+        };
+        recognition.start();
+      }
+
+      askButton.addEventListener("click", () => ask());
+      micButton.addEventListener("click", startMic);
+      questionInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") ask();
+      });
+      document.querySelectorAll("[data-question]").forEach((button) => {
+        button.addEventListener("click", () => {
+          questionInput.value = button.dataset.question;
+          ask(button.dataset.question);
+        });
+      });
+    </script>
+  </body>
+</html>
