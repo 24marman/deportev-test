@@ -3,8 +3,10 @@ const path = require("path");
 const { getDisplayTeamName } = require("../lib/team-metadata");
 
 const ANALYSIS_PATH = path.join(__dirname, "..", "..", "outputs", "analysis", "group-stage-best-xi.json");
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_TIMEOUT_MS = 7000;
 
-function answerSportsVoiceQuery(question, options = {}) {
+async function answerSportsVoiceQuery(question, options = {}) {
   const text = normalize(question);
   const analysis = loadAnalysis(options.analysisPath || ANALYSIS_PATH);
 
@@ -26,6 +28,47 @@ function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
+  const fallback = answerSportsVoiceQueryFromData(text, analysis);
+
+  if (!isVoiceAiEnabled()) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      reason: "VOICE_AI_ENABLED=false",
+    });
+  }
+
+  if (!getGeminiApiKey()) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      reason: "GEMINI_API_KEY is missing",
+    });
+  }
+
+  try {
+    return await answerWithGemini({
+      question,
+      normalizedQuestion: text,
+      analysis,
+      fallback,
+      fetchImpl: options.fetchImpl || globalThis.fetch,
+      timeoutMs: options.timeoutMs,
+    });
+  } catch (error) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      error: cleanErrorMessage(error),
+    });
+  }
+}
+
+function answerSportsVoiceQueryFromData(text, analysis) {
+  if (isTopGoalkeepersQuestion(text)) {
+    return answerTopGoalkeepers(analysis);
+  }
+
   if (isGoalkeeperSavesQuestion(text)) {
     return answerGoalkeeperSaves(analysis);
   }
@@ -36,10 +79,6 @@ function answerSportsVoiceQuery(question, options = {}) {
 
   if (isTopRatingQuestion(text)) {
     return answerTopRating(analysis);
-  }
-
-  if (isTopGoalkeepersQuestion(text)) {
-    return answerTopGoalkeepers(analysis);
   }
 
   return response({
@@ -54,6 +93,104 @@ function answerSportsVoiceQuery(question, options = {}) {
       "Quien tiene el mejor rating?",
     ],
   });
+}
+
+async function answerWithGemini({
+  question,
+  normalizedQuestion,
+  analysis,
+  fallback,
+  fetchImpl,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}) {
+  if (typeof fetchImpl !== "function") {
+    throw new Error("fetch is not available in this Node runtime.");
+  }
+
+  const model = getVoiceGeminiModel();
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(getGeminiApiKey())}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs || DEFAULT_TIMEOUT_MS)));
+
+  try {
+    const geminiResponse = await fetchImpl(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: buildVoiceGeminiPrompt() }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: JSON.stringify(
+                  {
+                    question,
+                    normalized_question: normalizedQuestion,
+                    data_context: buildVoiceDataContext(analysis, fallback),
+                    required_output_json: {
+                      intent: "string",
+                      answer: "string, respuesta natural en espanol de Mexico, lista para voz",
+                      confidence: "number 0-1",
+                      used_data: "array corto con los datos concretos usados",
+                      reasoning_summary: "explicacion breve del criterio, sin cadena de pensamiento",
+                    },
+                  },
+                  null,
+                  2,
+                ),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: Number(process.env.VOICE_AI_TEMPERATURE || 0.35),
+          maxOutputTokens: Number(process.env.VOICE_AI_MAX_OUTPUT_TOKENS || 320),
+          responseMimeType: "application/json",
+        },
+      }),
+    });
+
+    if (!geminiResponse.ok) {
+      const body = await safeResponseText(geminiResponse);
+      throw new Error(`Gemini voice reasoner failed (${geminiResponse.status}): ${body.slice(0, 180)}`);
+    }
+
+    const data = await geminiResponse.json();
+    const rawText = (data?.candidates?.[0]?.content?.parts || [])
+      .map((part) => part?.text || "")
+      .join("")
+      .trim();
+    const parsed = parseJsonResponse(rawText);
+    const answer = cleanAnswer(parsed.answer);
+
+    if (!answer) {
+      throw new Error("Gemini returned an empty answer.");
+    }
+
+    return response({
+      intent: parsed.intent || fallback.intent || "sports_data_question",
+      answer,
+      confidence: clampConfidence(parsed.confidence ?? fallback.confidence ?? 0.75),
+      source: "gemini-voice-data-reasoner",
+      dataSource: fallback.source,
+      data: fallback.data || null,
+      used_data: Array.isArray(parsed.used_data) ? parsed.used_data.slice(0, 6) : [],
+      reasoning_summary: cleanAnswer(parsed.reasoning_summary || ""),
+      ai: {
+        used: true,
+        provider: "gemini",
+        model,
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function answerGoalkeeperSaves(analysis) {
@@ -167,7 +304,7 @@ function isBestXiQuestion(text) {
 }
 
 function isTopRatingQuestion(text) {
-  return /(mejor|mayor|top).*(rating|calificacion|calificacion|nota)|rating.*(alto|mejor|mayor)/.test(text);
+  return /(mejor|mayor|top).*(rating|calificacion|nota)|rating.*(alto|mejor|mayor)/.test(text);
 }
 
 function response(payload) {
@@ -177,6 +314,134 @@ function response(payload) {
     generatedAt: new Date().toISOString(),
     ...payload,
   };
+}
+
+function withAiStatus(payload, ai) {
+  return {
+    ...payload,
+    ai: {
+      model: getVoiceGeminiModel(),
+      ...ai,
+    },
+  };
+}
+
+function buildVoiceGeminiPrompt() {
+  return [
+    "Eres el cerebro de voz de DeporteV: un analista deportivo mexicano que responde preguntas con criterio, claridad y cero relleno.",
+    "Tu tarea es razonar usando exclusivamente el JSON data_context que recibes. No inventes nombres, numeros, marcas, rankings ni contexto que no este en la evidencia.",
+    "Si la pregunta pide un dato puntual, responde directo y agrega solo el contexto mas util.",
+    "Si hay ranking, menciona el lider y, si cabe, uno o dos perseguidores. No leas tablas largas en voz.",
+    "Tono: natural, profesional, moderno, como una app deportiva o reportero mexicano informativo. Nada de narrador de TV ni frases infladas.",
+    "Respuesta para voz: una o dos frases cortas, sin markdown, sin hashtags, sin emojis, sin bullets.",
+    "Cuando no haya evidencia suficiente, dilo con honestidad y sugiere que dato si puedes responder con el contexto disponible.",
+    "Devuelve SOLO JSON valido con: intent, answer, confidence, used_data y reasoning_summary.",
+    "reasoning_summary debe ser un resumen breve del criterio usado, no una cadena de pensamiento paso a paso.",
+  ].join("\n");
+}
+
+function buildVoiceDataContext(analysis, fallback) {
+  const bestXI = (analysis.bestXI || []).map(toPublicPlayer);
+  const topGoalkeepersBySaves = (analysis.topGoalkeepersBySaves || []).slice(0, 10).map(toPublicPlayer);
+  const topByPosition = {};
+
+  for (const [position, players] of Object.entries(analysis.topByPosition || {})) {
+    topByPosition[position] = (players || []).slice(0, 8).map(toPublicPlayer);
+  }
+
+  return {
+    source: analysis.source || "bsd-api-analysis-cache",
+    scope: analysis.scope || "Mundial 2026, fase de grupos",
+    generated_at: analysis.generatedAt || null,
+    events_count: analysis.eventsCount || (analysis.events || []).length || null,
+    methodology: analysis.methodology || null,
+    detected_intent: fallback.intent || "unknown",
+    candidate_data_answer: fallback.answer || "",
+    facts: {
+      goalkeeper_most_saves: toPublicPlayer(analysis.goalkeeperMostSaves),
+      top_goalkeepers_by_saves: topGoalkeepersBySaves,
+      best_xi_by_weighted_rating: bestXI,
+      top_rating_from_best_xi: bestXI
+        .slice()
+        .sort((a, b) => Number(b.weightedRating || 0) - Number(a.weightedRating || 0))[0] || null,
+      top_by_position: topByPosition,
+    },
+  };
+}
+
+function toPublicPlayer(player) {
+  if (!player) return null;
+  return {
+    playerId: player.playerId,
+    name: player.name,
+    team: getDisplayTeamName(player.team),
+    rawTeam: player.team,
+    position: player.position,
+    weightedRating: player.weightedRating,
+    avgRating: player.avgRating,
+    appearances: player.appearances,
+    minutes: player.minutes,
+    goals: player.goals,
+    assists: player.assists,
+    saves: player.saves,
+    cleanSheets: player.cleanSheets,
+    goalsConceded: player.goalsConceded,
+  };
+}
+
+function getGeminiApiKey() {
+  return process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || "";
+}
+
+function getVoiceGeminiModel() {
+  return process.env.VOICE_AI_MODEL || process.env.GEMINI_TEXT_MODEL || DEFAULT_GEMINI_MODEL;
+}
+
+function isVoiceAiEnabled() {
+  return process.env.VOICE_AI_ENABLED !== "false";
+}
+
+function parseJsonResponse(value) {
+  const text = String(value || "").trim();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return {};
+    try {
+      return JSON.parse(match[0]);
+    } catch (innerError) {
+      return {};
+    }
+  }
+}
+
+async function safeResponseText(responseValue) {
+  try {
+    return await responseValue.text();
+  } catch (error) {
+    return "";
+  }
+}
+
+function cleanAnswer(value) {
+  return String(value || "")
+    .replace(/```(?:json)?/gi, "")
+    .replace(/```/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanErrorMessage(error) {
+  return String(error?.message || error || "Unknown Gemini error").slice(0, 220);
+}
+
+function clampConfidence(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0.75;
+  return Math.max(0, Math.min(1, number));
 }
 
 function normalize(value) {

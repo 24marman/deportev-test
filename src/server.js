@@ -9,6 +9,18 @@ const port = Number(process.env.PORT || 3000);
 const voiceDemoPath = path.join(__dirname, "voice", "voice-demo.html");
 
 const server = http.createServer((request, response) => {
+  handleRequest(request, response).catch((error) => {
+    response.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+    response.end(
+      JSON.stringify({
+        ok: false,
+        error: error?.message || "Unexpected server error",
+      }),
+    );
+  });
+});
+
+async function handleRequest(request, response) {
   const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
 
   if (url.pathname === "/health") {
@@ -18,7 +30,7 @@ const server = http.createServer((request, response) => {
   }
 
   if (url.pathname === "/api/voice/query") {
-    const answer = answerSportsVoiceQuery(url.searchParams.get("q") || "");
+    const answer = await answerSportsVoiceQuery(url.searchParams.get("q") || "");
     response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
     response.end(JSON.stringify(answer));
     return;
@@ -32,7 +44,7 @@ const server = http.createServer((request, response) => {
 
   response.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
   response.end("Mundial 2026 content engine is running. Open /voice for the voice data bot.\n");
-});
+}
 
 server.listen(port, () => {
   console.log(`Health server listening on ${port}`);

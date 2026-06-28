@@ -132,6 +132,11 @@
         line-height: 1.15;
       }
 
+      .answer small {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
       .chips {
         display: flex;
         flex-wrap: wrap;
@@ -159,7 +164,7 @@
     <main>
       <header>
         <h1>Voice Data Bot</h1>
-        <p>Pregunta con voz o texto. La respuesta se consulta desde la data y se lee con la voz del navegador.</p>
+        <p>Pregunta con voz o texto. Gemini razona con la data del torneo y la respuesta se lee con la voz del navegador.</p>
       </header>
 
       <section class="panel">
@@ -178,6 +183,7 @@
         <div class="answer">
           <strong id="intent">Listo</strong>
           <div id="answer">Haz una pregunta para escuchar la respuesta.</div>
+          <small id="meta">Modo: Gemini + data cuando la llave este activa.</small>
         </div>
       </section>
     </main>
@@ -186,6 +192,7 @@
       const questionInput = document.querySelector("#question");
       const answerEl = document.querySelector("#answer");
       const intentEl = document.querySelector("#intent");
+      const metaEl = document.querySelector("#meta");
       const askButton = document.querySelector("#ask");
       const micButton = document.querySelector("#mic");
 
@@ -194,21 +201,36 @@
         if (!q) return;
 
         askButton.disabled = true;
-        answerEl.textContent = "Consultando data...";
+        answerEl.textContent = "Gemini esta razonando con la data...";
         intentEl.textContent = "Procesando";
+        metaEl.textContent = "Modo: consultando Gemini.";
 
         try {
           const response = await fetch(`/api/voice/query?q=${encodeURIComponent(q)}`);
           const payload = await response.json();
           answerEl.textContent = payload.answer || "No encontre respuesta.";
           intentEl.textContent = payload.intent || "Respuesta";
+          metaEl.textContent = buildMeta(payload);
           speak(payload.answer || "");
         } catch (error) {
           answerEl.textContent = `No pude consultar el bot: ${error.message}`;
           intentEl.textContent = "Error";
+          metaEl.textContent = "Modo: error de consulta.";
         } finally {
           askButton.disabled = false;
         }
+      }
+
+      function buildMeta(payload) {
+        const ai = payload.ai || {};
+        if (ai.used) {
+          const model = ai.model ? ` (${ai.model})` : "";
+          const criteria = payload.reasoning_summary ? ` Criterio: ${payload.reasoning_summary}` : "";
+          return `Modo: Gemini + data${model}.${criteria}`;
+        }
+
+        const reason = ai.reason || ai.error || "sin detalle";
+        return `Modo: respaldo local. Gemini no respondio: ${reason}.`;
       }
 
       function speak(text) {
