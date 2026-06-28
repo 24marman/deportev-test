@@ -5,6 +5,10 @@ const {
   answerHistoricalVoiceContext,
   buildHistoricalVoiceContext,
 } = require("./historical-football-data");
+const {
+  answerLeagueVoiceContext,
+  buildLeagueVoiceContext,
+} = require("./league-football-data");
 
 const ANALYSIS_PATH = path.join(__dirname, "..", "..", "outputs", "analysis", "group-stage-best-xi.json");
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -13,10 +17,17 @@ const DEFAULT_TIMEOUT_MS = 7000;
 async function answerSportsVoiceQuery(question, options = {}) {
   const text = normalize(question);
   const analysis = loadAnalysis(options.analysisPath || ANALYSIS_PATH);
-  const historicalContext = await buildHistoricalVoiceContext(question, {
-    fetchImpl: options.fetchImpl || globalThis.fetch,
-    timeoutMs: options.timeoutMs,
-  });
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const [historicalContext, leagueContext] = await Promise.all([
+    buildHistoricalVoiceContext(question, {
+      fetchImpl,
+      timeoutMs: options.timeoutMs,
+    }),
+    buildLeagueVoiceContext(question, {
+      fetchImpl,
+      timeoutMs: options.timeoutMs,
+    }),
+  ]);
 
   if (!text) {
     return response({
@@ -27,7 +38,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  if (!analysis && !historicalContext) {
+  if (!analysis && !historicalContext && !leagueContext) {
     return response({
       intent: "missing_data",
       answer: "Todavia no tengo cargada la cache de analisis. Primero necesito calcular la data del torneo.",
@@ -36,13 +47,21 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  const fallback = answerSportsVoiceQueryFromData(text, analysis, historicalContext);
+  const fallback = answerSportsVoiceQueryFromData(text, analysis, historicalContext, leagueContext);
 
   if (historicalContext && !historicalContext.available) {
     return withAiStatus(fallback, {
       used: false,
       provider: "gemini",
       reason: historicalContext.reason || "historical_context unavailable",
+    });
+  }
+
+  if (leagueContext && !leagueContext.available) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      reason: leagueContext.reason || "league_context unavailable",
     });
   }
 
@@ -69,7 +88,8 @@ async function answerSportsVoiceQuery(question, options = {}) {
       analysis,
       fallback,
       historicalContext,
-      fetchImpl: options.fetchImpl || globalThis.fetch,
+      leagueContext,
+      fetchImpl,
       timeoutMs: options.timeoutMs,
     });
   } catch (error) {
@@ -81,9 +101,13 @@ async function answerSportsVoiceQuery(question, options = {}) {
   }
 }
 
-function answerSportsVoiceQueryFromData(text, analysis, historicalContext = null) {
+function answerSportsVoiceQueryFromData(text, analysis, historicalContext = null, leagueContext = null) {
   if (historicalContext) {
     return response(answerHistoricalVoiceContext(historicalContext));
+  }
+
+  if (leagueContext) {
+    return response(answerLeagueVoiceContext(leagueContext));
   }
 
   if (!analysis) {
@@ -131,6 +155,7 @@ async function answerWithGemini({
   analysis,
   fallback,
   historicalContext,
+  leagueContext,
   fetchImpl,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
@@ -163,7 +188,7 @@ async function answerWithGemini({
                   {
                     question,
                     normalized_question: normalizedQuestion,
-                    data_context: buildVoiceDataContext(analysis, fallback, historicalContext),
+                    data_context: buildVoiceDataContext(analysis, fallback, historicalContext, leagueContext),
                     required_output_json: {
                       intent: "string",
                       answer: "string, respuesta natural en espanol de Mexico, lista para voz",
@@ -365,6 +390,12 @@ function buildVoiceGeminiPrompt() {
     "Si data_context trae historical_context, dale prioridad para preguntas de historial, enfrentamientos, duelos o cara a cara.",
     "Si historical_context.coverage.complete es false, aclara que el API solo devolvio esos partidos y no afirmes que es el historial completo.",
     "Si historical_context no esta disponible por falta de cobertura del API, explica esa limitacion sin inventar resultados.",
+    "Si data_context trae league_context, usalo para preguntas de Liga MX, Apertura, Clausura, tabla, calendario, finales o temporadas pasadas.",
+    "Si la pregunta es sobre temporadas pasadas, usa league_context.seasons_available y explica de forma natural que cobertura trae el API.",
+    "Importante: seasons_available solo confirma el catalogo de temporadas. No prometas resultados, partidos o tablas de una temporada si standings y recent_events estan vacios.",
+    "En preguntas de temporadas pasadas, usa frases como 'el catalogo trae' o 'BSD lista esas temporadas'; evita decir 'todos los datos disponibles' o 'puedo consultar cualquiera' si no hay tabla o partidos.",
+    "Si league_context.detected_query_type es 'seasons', sigue casi literal candidate_data_answer y no agregues promesas de consulta.",
+    "Para Liga MX, no digas que no tienes informacion si league_context trae standings, recent_events, live_events o seasons_available.",
     "Si hay ranking, menciona el lider y, si cabe, uno o dos perseguidores. No leas tablas largas en voz.",
     "Tono: natural, profesional, moderno, como una app deportiva o reportero mexicano informativo. Nada de narrador de TV ni frases infladas.",
     "Respuesta para voz: una o dos frases cortas, sin markdown, sin hashtags, sin emojis, sin bullets.",
@@ -374,7 +405,7 @@ function buildVoiceGeminiPrompt() {
   ].join("\n");
 }
 
-function buildVoiceDataContext(analysis, fallback, historicalContext = null) {
+function buildVoiceDataContext(analysis, fallback, historicalContext = null, leagueContext = null) {
   const safeAnalysis = analysis || {};
   const bestXI = (safeAnalysis.bestXI || []).map(toPublicPlayer);
   const topGoalkeepersBySaves = (safeAnalysis.topGoalkeepersBySaves || []).slice(0, 10).map(toPublicPlayer);
@@ -393,6 +424,7 @@ function buildVoiceDataContext(analysis, fallback, historicalContext = null) {
     detected_intent: fallback.intent || "unknown",
     candidate_data_answer: fallback.answer || "",
     historical_context: historicalContext,
+    league_context: leagueContext,
     facts: {
       goalkeeper_most_saves: toPublicPlayer(safeAnalysis.goalkeeperMostSaves),
       top_goalkeepers_by_saves: topGoalkeepersBySaves,
