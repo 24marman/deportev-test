@@ -9,21 +9,30 @@ const {
   answerLeagueVoiceContext,
   buildLeagueVoiceContext,
 } = require("./league-football-data");
+const {
+  answerWorldCupVoiceContext,
+  buildWorldCupVoiceContext,
+} = require("./world-cup-football-data");
 
 const ANALYSIS_PATH = path.join(__dirname, "..", "..", "outputs", "analysis", "group-stage-best-xi.json");
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-const DEFAULT_TIMEOUT_MS = 7000;
+const DEFAULT_TIMEOUT_MS = 12000;
 
 async function answerSportsVoiceQuery(question, options = {}) {
   const text = normalize(question);
   const analysis = loadAnalysis(options.analysisPath || ANALYSIS_PATH);
   const fetchImpl = options.fetchImpl || globalThis.fetch;
-  const [historicalContext, leagueContext] = await Promise.all([
+  const [historicalContext, leagueContext, worldCupContext] = await Promise.all([
     buildHistoricalVoiceContext(question, {
       fetchImpl,
       timeoutMs: options.timeoutMs,
     }),
     buildLeagueVoiceContext(question, {
+      fetchImpl,
+      timeoutMs: options.timeoutMs,
+    }),
+    buildWorldCupVoiceContext(question, {
+      analysis,
       fetchImpl,
       timeoutMs: options.timeoutMs,
     }),
@@ -38,7 +47,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  if (!analysis && !historicalContext && !leagueContext) {
+  if (!analysis && !historicalContext && !leagueContext && !worldCupContext) {
     return response({
       intent: "missing_data",
       answer: "Todavia no tengo cargada la cache de analisis. Primero necesito calcular la data del torneo.",
@@ -47,7 +56,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
     });
   }
 
-  const fallback = answerSportsVoiceQueryFromData(text, analysis, historicalContext, leagueContext);
+  const fallback = answerSportsVoiceQueryFromData(text, analysis, historicalContext, leagueContext, worldCupContext);
 
   if (historicalContext && !historicalContext.available) {
     return withAiStatus(fallback, {
@@ -62,6 +71,14 @@ async function answerSportsVoiceQuery(question, options = {}) {
       used: false,
       provider: "gemini",
       reason: leagueContext.reason || "league_context unavailable",
+    });
+  }
+
+  if (worldCupContext && !worldCupContext.available) {
+    return withAiStatus(fallback, {
+      used: false,
+      provider: "gemini",
+      reason: worldCupContext.reason || "world_cup_context unavailable",
     });
   }
 
@@ -89,6 +106,7 @@ async function answerSportsVoiceQuery(question, options = {}) {
       fallback,
       historicalContext,
       leagueContext,
+      worldCupContext,
       fetchImpl,
       timeoutMs: options.timeoutMs,
     });
@@ -101,13 +119,23 @@ async function answerSportsVoiceQuery(question, options = {}) {
   }
 }
 
-function answerSportsVoiceQueryFromData(text, analysis, historicalContext = null, leagueContext = null) {
+function answerSportsVoiceQueryFromData(
+  text,
+  analysis,
+  historicalContext = null,
+  leagueContext = null,
+  worldCupContext = null,
+) {
   if (historicalContext) {
     return response(answerHistoricalVoiceContext(historicalContext));
   }
 
   if (leagueContext) {
     return response(answerLeagueVoiceContext(leagueContext));
+  }
+
+  if (worldCupContext) {
+    return response(answerWorldCupVoiceContext(worldCupContext));
   }
 
   if (!analysis) {
@@ -135,10 +163,14 @@ function answerSportsVoiceQueryFromData(text, analysis, historicalContext = null
     return answerTopRating(analysis);
   }
 
+  if (isPredictionQuestion(text)) {
+    return answerPredictionQuestion(analysis);
+  }
+
   return response({
     intent: "unknown",
     answer:
-      "Todavia no tengo esa consulta lista. Por ahora puedo responder sobre el XI ideal, el mejor rating y el portero con mas atajadas.",
+      "Puedo razonar con la data cargada del Mundial 2026, pero necesito una pregunta mas especifica para darte una respuesta precisa.",
     confidence: 0.35,
     source: "voice-query-router",
     suggestions: [
@@ -156,6 +188,7 @@ async function answerWithGemini({
   fallback,
   historicalContext,
   leagueContext,
+  worldCupContext,
   fetchImpl,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
@@ -188,7 +221,13 @@ async function answerWithGemini({
                   {
                     question,
                     normalized_question: normalizedQuestion,
-                    data_context: buildVoiceDataContext(analysis, fallback, historicalContext, leagueContext),
+                    data_context: buildVoiceDataContext(
+                      analysis,
+                      fallback,
+                      historicalContext,
+                      leagueContext,
+                      worldCupContext,
+                    ),
                     required_output_json: {
                       intent: "string",
                       answer: "string, respuesta natural en espanol de Mexico, lista para voz",
@@ -339,6 +378,35 @@ function answerTopGoalkeepers(analysis) {
   });
 }
 
+function answerPredictionQuestion(analysis) {
+  const tournament = buildTournamentVoiceSnapshot(analysis);
+  const candidates = tournament.favorite_candidates.slice(0, 4);
+  if (!candidates.length) {
+    return response({
+      intent: "prediction_request",
+      answer: "No puedo dar un favorito con la data actual porque no encontre suficiente forma de equipos en la cache.",
+      confidence: 0.6,
+      source: "group-stage-analysis-cache",
+      data: tournament,
+    });
+  }
+
+  const [first, second, third] = candidates;
+  const supporting = [
+    `${first.team} por su fase perfecta y diferencia de ${signedNumber(first.goal_difference)}`,
+    second ? `${second.team} por equilibrio y produccion ofensiva` : "",
+    third ? `${third.team} tambien entra en la conversacion` : "",
+  ].filter(Boolean);
+
+  return response({
+    intent: "prediction_request",
+    answer: `No hay forma seria de asegurarlo, pero con la data de fase de grupos pondria arriba a ${joinSpanish(supporting)}.`,
+    confidence: 0.72,
+    source: "group-stage-analysis-cache",
+    data: tournament,
+  });
+}
+
 function loadAnalysis(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -361,6 +429,14 @@ function isBestXiQuestion(text) {
 
 function isTopRatingQuestion(text) {
   return /(mejor|mayor|top).*(rating|calificacion|nota)|rating.*(alto|mejor|mayor)/.test(text);
+}
+
+function isPredictionQuestion(text) {
+  return (
+    /(quien|quienes).*(ganar|gana|campeon|favorit|candidat).*(mundial|copa|torneo)/.test(text) ||
+    /(favorit|candidat).*(mundial|copa|torneo)/.test(text) ||
+    /(quien va a ganar|quien gana|quien sale campeon|quien sera campeon)/.test(text)
+  );
 }
 
 function response(payload) {
@@ -396,7 +472,15 @@ function buildVoiceGeminiPrompt() {
     "En preguntas de temporadas pasadas, usa frases como 'el catalogo trae' o 'BSD lista esas temporadas'; evita decir 'todos los datos disponibles' o 'puedo consultar cualquiera' si no hay tabla o partidos.",
     "Si league_context.detected_query_type es 'seasons', sigue casi literal candidate_data_answer y no agregues promesas de consulta.",
     "Para Liga MX, no digas que no tienes informacion si league_context trae standings, recent_events, live_events o seasons_available.",
+    "Si data_context trae world_cup_context, usalo para preguntas del Mundial sobre predicciones, favoritos, odds, stats, xG, shotmap, incidencias, h2h o resumen de partido.",
+    "Para predicciones del Mundial, distingue entre prediccion partido por partido de BSD y una lectura de candidato al titulo. No prometas certeza ni inventes mercado de campeon si solo hay predicciones de partidos.",
+    "Cuando hables de predicciones de BSD, di 'modelo de BSD' o 'modelo de la API', nunca 'nuestro modelo'.",
+    "Para preguntas de stats usa xG, remates, posesion, ataques peligrosos, big chances y shotmap si vienen en world_cup_context.",
+    "tournament_context.candidate_score es un indicador calculado localmente desde la data disponible, no un campo directo de la API; si lo usas, llamalo 'lectura de forma' o 'indicador interno'.",
     "Si hay ranking, menciona el lider y, si cabe, uno o dos perseguidores. No leas tablas largas en voz.",
+    "candidate_data_answer es solo un respaldo local, no una restriccion. Si el JSON trae datos suficientes para responder mejor, ignora el fallback.",
+    "Si la pregunta pide una prediccion o favorito del Mundial y tournament_context existe, no digas que no puedes responder. Da una lectura probabilistica y honesta, sin garantizar el futuro.",
+    "Para predicciones usa forma de equipos, puntos, diferencia de goles, goles a favor, goles recibidos, invicto, arcos en cero y jugadores destacados. Responde con 'favoritos' o 'candidatos', no con certeza absoluta.",
     "Tono: natural, profesional, moderno, como una app deportiva o reportero mexicano informativo. Nada de narrador de TV ni frases infladas.",
     "Respuesta para voz: una o dos frases cortas, sin markdown, sin hashtags, sin emojis, sin bullets.",
     "Cuando no haya evidencia suficiente, dilo con honestidad y sugiere que dato si puedes responder con el contexto disponible.",
@@ -405,7 +489,13 @@ function buildVoiceGeminiPrompt() {
   ].join("\n");
 }
 
-function buildVoiceDataContext(analysis, fallback, historicalContext = null, leagueContext = null) {
+function buildVoiceDataContext(
+  analysis,
+  fallback,
+  historicalContext = null,
+  leagueContext = null,
+  worldCupContext = null,
+) {
   const safeAnalysis = analysis || {};
   const bestXI = (safeAnalysis.bestXI || []).map(toPublicPlayer);
   const topGoalkeepersBySaves = (safeAnalysis.topGoalkeepersBySaves || []).slice(0, 10).map(toPublicPlayer);
@@ -425,6 +515,8 @@ function buildVoiceDataContext(analysis, fallback, historicalContext = null, lea
     candidate_data_answer: fallback.answer || "",
     historical_context: historicalContext,
     league_context: leagueContext,
+    world_cup_context: worldCupContext,
+    tournament_context: buildTournamentVoiceSnapshot(safeAnalysis),
     facts: {
       goalkeeper_most_saves: toPublicPlayer(safeAnalysis.goalkeeperMostSaves),
       top_goalkeepers_by_saves: topGoalkeepersBySaves,
@@ -434,6 +526,164 @@ function buildVoiceDataContext(analysis, fallback, historicalContext = null, lea
         .sort((a, b) => Number(b.weightedRating || 0) - Number(a.weightedRating || 0))[0] || null,
       top_by_position: topByPosition,
     },
+  };
+}
+
+function buildTournamentVoiceSnapshot(analysis) {
+  const events = Array.isArray(analysis?.events) ? analysis.events : [];
+  const teams = new Map();
+
+  for (const event of events) {
+    const score = parseScore(event.score);
+    if (!score) continue;
+    recordTeamMatch(teams, event.home, score.home, score.away, event);
+    recordTeamMatch(teams, event.away, score.away, score.home, event);
+  }
+
+  const playerImpact = buildPlayerImpactByTeam(analysis);
+  const standings = [...teams.values()]
+    .map((team) => {
+      const impact = playerImpact.get(team.rawTeam) || playerImpact.get(team.team) || emptyPlayerImpact(team.rawTeam);
+      const goalDifference = team.goals_for - team.goals_against;
+      const undefeated = team.losses === 0;
+      const candidateScore =
+        team.points * 3 +
+        goalDifference * 1.15 +
+        team.goals_for * 0.65 +
+        team.clean_sheets * 0.85 +
+        (undefeated ? 1.5 : 0) +
+        impact.top_player_count * 0.7 +
+        impact.best_weighted_rating * 0.35;
+
+      return {
+        ...team,
+        goal_difference: goalDifference,
+        undefeated,
+        candidate_score: Number(candidateScore.toFixed(2)),
+        player_signal: impact,
+      };
+    })
+    .sort((a, b) => b.points - a.points || b.goal_difference - a.goal_difference || b.goals_for - a.goals_for);
+
+  const favoriteCandidates = standings
+    .slice()
+    .sort((a, b) => b.candidate_score - a.candidate_score)
+    .slice(0, 8)
+    .map(toPublicTeamSnapshot);
+
+  return {
+    source: analysis?.source || "group-stage-analysis-cache",
+    scope: analysis?.scope || "Mundial 2026",
+    generated_at: analysis?.generatedAt || null,
+    events_count: analysis?.eventsCount || events.length || 0,
+    prediction_policy:
+      "No garantiza resultados futuros; ordena candidatos usando forma de fase de grupos y senales individuales disponibles.",
+    standings_top: standings.slice(0, 12).map(toPublicTeamSnapshot),
+    favorite_candidates: favoriteCandidates,
+  };
+}
+
+function recordTeamMatch(teams, rawTeam, goalsFor, goalsAgainst, event) {
+  const team = String(rawTeam || "").trim();
+  if (!team) return;
+  const current =
+    teams.get(team) ||
+    {
+      rawTeam: team,
+      team: getDisplayTeamName(team),
+      played: 0,
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goals_for: 0,
+      goals_against: 0,
+      points: 0,
+      clean_sheets: 0,
+      groups: new Set(),
+    };
+
+  current.played += 1;
+  current.goals_for += Number(goalsFor || 0);
+  current.goals_against += Number(goalsAgainst || 0);
+  if (goalsFor > goalsAgainst) {
+    current.wins += 1;
+    current.points += 3;
+  } else if (goalsFor === goalsAgainst) {
+    current.draws += 1;
+    current.points += 1;
+  } else {
+    current.losses += 1;
+  }
+  if (Number(goalsAgainst || 0) === 0) current.clean_sheets += 1;
+  if (event?.group) current.groups.add(event.group);
+
+  teams.set(team, current);
+}
+
+function buildPlayerImpactByTeam(analysis) {
+  const impact = new Map();
+  const players = [
+    ...(Array.isArray(analysis?.bestXI) ? analysis.bestXI : []),
+    ...Object.values(analysis?.topByPosition || {}).flatMap((list) => (Array.isArray(list) ? list.slice(0, 5) : [])),
+  ];
+
+  for (const player of players) {
+    const team = String(player?.team || "").trim();
+    if (!team) continue;
+    const current = impact.get(team) || emptyPlayerImpact(team);
+    current.top_player_count += 1;
+    current.best_weighted_rating = Math.max(current.best_weighted_rating, Number(player.weightedRating || 0));
+    if (current.highlight_players.length < 4) {
+      current.highlight_players.push({
+        name: player.name,
+        position: player.position,
+        weightedRating: player.weightedRating,
+        goals: player.goals,
+        assists: player.assists,
+        saves: player.saves,
+      });
+    }
+    impact.set(team, current);
+  }
+
+  return impact;
+}
+
+function emptyPlayerImpact(team) {
+  return {
+    team: getDisplayTeamName(team),
+    top_player_count: 0,
+    best_weighted_rating: 0,
+    highlight_players: [],
+  };
+}
+
+function toPublicTeamSnapshot(team) {
+  return {
+    team: team.team,
+    rawTeam: team.rawTeam,
+    group: Array.from(team.groups || [])[0] || null,
+    played: team.played,
+    wins: team.wins,
+    draws: team.draws,
+    losses: team.losses,
+    points: team.points,
+    goals_for: team.goals_for,
+    goals_against: team.goals_against,
+    goal_difference: team.goal_difference,
+    clean_sheets: team.clean_sheets,
+    undefeated: team.undefeated,
+    candidate_score: team.candidate_score,
+    player_signal: team.player_signal,
+  };
+}
+
+function parseScore(score) {
+  const match = String(score || "").match(/(\d+)\s*-\s*(\d+)/);
+  if (!match) return null;
+  return {
+    home: Number(match[1]),
+    away: Number(match[2]),
   };
 }
 
@@ -532,6 +782,11 @@ function spokenTeam(value) {
 
 function formatRating(value) {
   return Number(value || 0).toFixed(2);
+}
+
+function signedNumber(value) {
+  const number = Number(value || 0);
+  return number > 0 ? `+${number}` : String(number);
 }
 
 function joinSpanish(items) {
